@@ -5,6 +5,8 @@ from fastapi import FastAPI
 
 from app.database import engine, Base
 from app.tasks import sync_weather_data
+from app.schemas import PREDEFINED_LOCATIONS, LocationMetaData, LocationListResponse
+
 
 # Logging configuration
 logging.basicConfig(
@@ -43,4 +45,12 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Weather Data Microservice",
               version="0.0.1", lifespan=lifespan)
 
-# TODO: Add GET data endpoints below
+
+@app.get("/v1/locations", response_model=LocationListResponse)
+async def get_supported_locations():
+    """Retrieves all static supported locations with their respective string IDs and display names."""
+    meta_list = [
+        LocationMetaData(id=loc_id, name=details["name"])
+        for loc_id, details in PREDEFINED_LOCATIONS.items()
+    ]
+    return LocationListResponse(locations=meta_list)

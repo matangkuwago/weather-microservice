@@ -1,23 +1,34 @@
 from enum import Enum
 from pydantic import BaseModel, Field
-from datetime import date, datetime
+from datetime import datetime
 from typing import List
 
 
 PREDEFINED_LOCATIONS = {
-    "ny": {"name": "New York", "lat": 40.7128, "lon": -74.0060},
+    "mnl": {"name": "Manila", "lat": 14.5995, "lon": 120.9842},
     "tk": {"name": "Tokyo", "lat": 35.6762, "lon": 139.6503},
-    "ldn": {"name": "London", "lat": 51.5074, "lon": -0.1278},
+    "ny": {"name": "New York", "lat": 40.7128, "lon": -74.0060},
 }
 
 
 class AllowedLocations(str, Enum):
-    new_york = "ny"
+    manila = "mnl"
     tokyo = "tk"
-    london = "ldn"
+    new_york = "ny"
 
 
 class WeatherDataPoint(BaseModel):
     timestamp: datetime
     wind_speed: float
     radiation: float
+
+
+class LocationMetaData(BaseModel):
+    id: str = Field(...,
+                    description="Unique short code string identifier (e.g., 'mnl')")
+    name: str = Field(..., description="Full human-readable display name of the city (e.g., 'Manila')")
+
+
+class LocationListResponse(BaseModel):
+    locations: List[LocationMetaData] = Field(
+        ..., description="Array containing all supported metadata locations")

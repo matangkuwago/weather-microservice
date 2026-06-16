@@ -1,8 +1,12 @@
 ## 🌦️ Weather Analytics & Local AI Agent Microservice
 
-A containerized, lightweight weather analytics platform built with FastAPI and Streamlit. The system maintains a rolling database cache of the past 30 days of hourly wind speed and solar radiation data for Manila, Tokyo, and New York from the Open-Meteo Archive API. The system uses the Interquartile Range (IQR) anomaly detection pipeline and an AI Chat Assistant capable of executing backend tool calls to summarize metrics and isolate weather anomalies.
+A containerized, lightweight weather analytics platform built with FastAPI and Streamlit. 
 
-------------------------------
+The system maintains a rolling database cache of the past 30 days. It tracks hourly wind speed and solar radiation for Manila, Tokyo, and New York. All historical data comes from the Open-Meteo Archive API.
+
+The system uses an Interquartile Range (IQR) pipeline to find anomalies. It also includes an AI Chat Assistant. The assistant automatically runs backend tool calls to summarize data and pinpoint weather extremes.
+
+
 ## 🛠️ System Architecture & Layout
 The project enforces a separation of concerns, decoupling the frontend interface and backend services.
 
@@ -54,12 +58,9 @@ Here is why the Interquartile Range (IQR) method works much better than a Z-scor
     *   This ensures your baseline limits aren't ruined by a single crazy sensor error or a passing storm.
 
 
-
-
-------------------------------
 ## ⚡ Quick Start
 
-## 1. Setup Your Configuration Matrix
+## 1. Configure the AI Agent Environment Variables
 Create a file named `.env` in the root directory:
 
 ```bash
@@ -90,7 +91,7 @@ Open your browser to start exploring:
 * Interactive Dashboard: http://localhost:8501
 * FastAPI API Swagger Documentation Docs: http://localhost:8000/docs
 
-------------------------------
+
 ## 💬 Conversational Starters to Try in the Dashboard
 
 The AI Weather Assistant understands everyday language (like 'last week'), automatically converts it into exact dates, grabs the right data for multiple cities at once, and handles all the math for you.

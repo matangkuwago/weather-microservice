@@ -217,5 +217,9 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# DB files
+# --- Local DB data ---
 data
+
+# --- OS Files ---
+.DS_Store
+Thumbs.db

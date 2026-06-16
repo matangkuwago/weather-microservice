@@ -1,0 +1,21 @@
+FROM ollama/ollama:latest
+
+# 1. Open up the default Ollama network port environment variable
+ENV OLLAMA_HOST=0.0.0.0:11434
+
+# 2. Define the build argument (defaults to ollama if not passed)
+ARG AI_PROVIDER=ollama
+
+# 3. Conditional build check: Only pull the model if AI_PROVIDER is explicitly 'ollama'
+RUN if [ "$AI_PROVIDER" = "ollama" ]; then \
+        echo "AI_PROVIDER is set to ollama. Proceeding with the local LLM container build..." && \
+        ollama serve & \
+        sleep 5 && \
+        ollama pull qwen2.5:7b && \
+        pkill ollama; \
+    else \
+        echo "AI_PROVIDER is set to '$AI_PROVIDER'. Skipping local LLM container build."; \
+    fi
+
+# Expose the network interface
+EXPOSE 11434

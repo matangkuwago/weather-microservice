@@ -3,7 +3,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, UniqueConstraint
 
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///./weather.db"
+SQLALCHEMY_DATABASE_URL = "sqlite:///./data/weather.db"
 
 engine = create_engine(
     # connect_args is needed only for SQLite to allow multi-threading in FastAPI

@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import Literal
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -10,6 +11,15 @@ class Settings(BaseSettings):
     # As per https://github.com/open-meteo/open-data/blob/main/README.md,
     # historical data gets updated every 24 hours.
     SYNC_INTERVAL_SECONDS: int = 86400
+
+    # AI chat agent settings
+    AI_PROVIDER: Literal["ollama", "openai", "anthropic"] = "ollama"
+    OLLAMA_MODEL: str = "qwen2.5:7b"
+    OPENAI_MODEL: str = "gpt-4o"
+    ANTHROPIC_MODEL: str = "claude-3-5-sonnet-20241022"
+    OLLAMA_BASE_URL: str = "http://ollama:11434"
+    OPENAI_API_KEY: str = ""
+    ANTHROPIC_API_KEY: str = ""
 
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="ignore")

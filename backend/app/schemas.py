@@ -1,5 +1,4 @@
-from enum import Enum
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from datetime import date, datetime
 from typing import List, Optional
 
@@ -11,12 +10,6 @@ PREDEFINED_LOCATIONS = {
 }
 
 
-class AllowedLocations(str, Enum):
-    manila = "mnl"
-    tokyo = "tk"
-    new_york = "ny"
-
-
 class WeatherDataPoint(BaseModel):
     timestamp: datetime
     wind_speed: float
@@ -24,10 +17,25 @@ class WeatherDataPoint(BaseModel):
 
 
 class WeatherQueryParams(BaseModel):
-    location_id: AllowedLocations = Field(
-        ..., description="Location Id")
+    location_id: str = Field(...,
+                             description="The location's unique short identifier")
     start_date: date = Field(..., description="Start date (YYYY-MM-DD)")
     end_date: date = Field(..., description="End date (YYYY-MM-DD)")
+
+    @field_validator("location_id")
+    @classmethod
+    def validate_location_id(cls, value: str) -> str:
+        """Runtime validator to ensure the location exists in our master dictionary."""
+        normalized_value = value.strip().lower()
+
+        if normalized_value not in PREDEFINED_LOCATIONS:
+            allowed_keys = ", ".join(
+                f"'{k}'" for k in PREDEFINED_LOCATIONS.keys())
+            raise ValueError(
+                f"Invalid location_id '{value}'. Must be one of: {allowed_keys}"
+            )
+
+        return normalized_value
 
 
 class LocationMeta(BaseModel):
@@ -66,3 +74,11 @@ class AnomalyResponse(BaseModel):
     method: str = "IQR"
     wind_speed_anomalies: List[AnomalyPoint]
     radiation_anomalies: List[AnomalyPoint]
+
+
+class ChatRequest(BaseModel):
+    message: str
+
+
+class ChatResponse(BaseModel):
+    reply: str

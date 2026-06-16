@@ -9,7 +9,10 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./backend/weather.db:/app/weather.db
+      - ./data:/app/data
+    env_file:
+      - path: ./.env
+        required: false
     restart: unless-stopped
 
   dashboard:
@@ -21,4 +24,15 @@ services:
       - "8501:8501"
     depends_on:
       - backend
+    restart: unless-stopped
+
+  ollama:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.Ollama
+      args:
+        - AI_PROVIDER=${AI_PROVIDER:-ollama}
+    container_name: weather_ollama
+    ports:
+      - "11434:11434"
     restart: unless-stopped

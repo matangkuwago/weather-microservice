@@ -10,12 +10,16 @@ from app.schemas import (
     WeatherDataPoint,
     AnomalyPoint
 )
+from langchain_anthropic import ChatAnthropic
+from langchain_ollama import ChatOllama
+from langchain_openai import ChatOpenAI
+from app.config import settings
 
 
 logger = logging.getLogger("weather-api")
 
 
-async def get_cached_weather(
+def get_cached_weather(
     params: WeatherQueryParams,
     db: Session
 ) -> Tuple[dict, List[WeatherData]]:
@@ -23,7 +27,7 @@ async def get_cached_weather(
     Pure cache-read service. Queries the local SQLite database instantly.
     Contains zero external network fallback code.
     """
-    loc_id = params.location_id.value
+    loc_id = params.location_id
     coords = PREDEFINED_LOCATIONS[loc_id]
 
     start_dt = datetime.combine(params.start_date, time.min)

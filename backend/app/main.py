@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Depends, Query
+from fastapi import FastAPI, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 from app.database import engine, Base, get_db
 from app.tasks import sync_weather_data
@@ -12,9 +12,12 @@ from app.schemas import (
     WeatherQueryParams,
     WeatherResponse,
     WeatherDataPoint,
-    AnomalyResponse
+    AnomalyResponse,
+    ChatRequest,
+    ChatResponse
 )
 from app.services import get_cached_weather, detect_iqr_anomalies
+from app.agent import get_weather_agent_executor
 
 
 # Logging configuration
@@ -67,13 +70,13 @@ async def get_supported_locations():
 
 @app.get("/v1/weather-data", response_model=WeatherResponse)
 async def get_weather(params: WeatherQueryParams = Depends(), db: Session = Depends(get_db)):
-    location, records = await get_cached_weather(params, db)
+    location, records = get_cached_weather(params, db)
     data_points = [WeatherDataPoint(
         timestamp=r.timestamp, wind_speed=r.wind_speed, radiation=r.radiation) for r in records]
 
     return WeatherResponse(
         location=LocationMeta(
-            id=params.location_id.value,
+            id=params.location_id,
             name=location["name"],
             latitude=location["latitude"],
             longitude=location["longitude"]
@@ -88,7 +91,7 @@ async def get_anomalies(
     threshold: float = Query(1.5, description="IQR multiplier threshold"),
     db: Session = Depends(get_db)
 ):
-    location, records = await get_cached_weather(params, db)
+    location, records = get_cached_weather(params, db)
     data_points = [WeatherDataPoint(
         timestamp=r.timestamp, wind_speed=r.wind_speed, radiation=r.radiation) for r in records]
 
@@ -96,7 +99,7 @@ async def get_anomalies(
 
     return AnomalyResponse(
         location=LocationMeta(
-            id=params.location_id.value,
+            id=params.location_id,
             name=location["name"],
             latitude=location["latitude"],
             longitude=location["longitude"]
@@ -105,3 +108,19 @@ async def get_anomalies(
         wind_speed_anomalies=anomalies["wind_speed"],
         radiation_anomalies=anomalies["radiation"]
     )
+
+
+@app.post("/v1/chat", response_model=ChatResponse)
+async def handle_agent_chat(payload: ChatRequest):
+    try:
+        executor = get_weather_agent_executor()
+
+        # Invoke the LangChain computational chain
+        # The agent resolves time queries, hooks the tool, extracts database rows,
+        # and calculates other relevant data
+        result = executor.invoke(
+            {"input": payload.message, "chat_history": []})
+
+        return ChatResponse(reply=result["output"])
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Agent Error: {str(e)}")

@@ -1,10 +1,18 @@
+import numpy as np
+import logging
 from datetime import datetime, time
 from sqlalchemy.orm import Session
-from typing import List, Tuple
-
+from typing import List, Tuple, Dict
 from app.database import WeatherData
-from app.schemas import PREDEFINED_LOCATIONS
-from app.schemas import WeatherQueryParams
+from app.schemas import (
+    PREDEFINED_LOCATIONS,
+    WeatherQueryParams,
+    WeatherDataPoint,
+    AnomalyPoint
+)
+
+
+logger = logging.getLogger("weather-api")
 
 
 async def get_cached_weather(
@@ -20,6 +28,7 @@ async def get_cached_weather(
 
     start_dt = datetime.combine(params.start_date, time.min)
     end_dt = datetime.combine(params.end_date, time.max)
+    logging.info(f"Retrieving data for {loc_id=}, {start_dt=}, {end_dt=}")
 
     # Query local database directly
     records = db.query(WeatherData).filter(
@@ -36,3 +45,35 @@ async def get_cached_weather(
     }
 
     return location_meta, records
+
+
+def detect_iqr_anomalies(data: List[WeatherDataPoint], factor: float = 1.5) -> Dict[str, List[AnomalyPoint]]:
+    if not data:
+        return {"wind_speed": [], "radiation": []}
+
+    wind_speeds = [p.wind_speed for p in data]
+    radiations = [p.radiation for p in data]
+
+    def get_bounds(values: List[float]) -> tuple[float, float]:
+        q1, q3 = np.percentile(values, [25, 75])
+        iqr = q3 - q1
+        return q1 - (factor * iqr), q3 + (factor * iqr)
+
+    w_lower, w_upper = get_bounds(wind_speeds)
+    r_lower, r_upper = get_bounds(radiations)
+
+    wind_anomalies = []
+    radiation_anomalies = []
+
+    for p in data:
+        if p.wind_speed < w_lower or p.wind_speed > w_upper:
+            limit = w_upper if p.wind_speed > w_upper else w_lower
+            wind_anomalies.append(AnomalyPoint(
+                timestamp=p.timestamp, value=p.wind_speed, bound_limit=limit))
+
+        if p.radiation < r_lower or p.radiation > r_upper:
+            limit = r_upper if p.radiation > r_upper else r_lower
+            radiation_anomalies.append(AnomalyPoint(
+                timestamp=p.timestamp, value=p.radiation, bound_limit=limit))
+
+    return {"wind_speed": wind_anomalies, "radiation": radiation_anomalies}

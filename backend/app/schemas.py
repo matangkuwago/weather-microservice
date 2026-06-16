@@ -1,7 +1,7 @@
 from enum import Enum
 from pydantic import BaseModel, Field
 from datetime import date, datetime
-from typing import List
+from typing import List, Optional
 
 
 PREDEFINED_LOCATIONS = {
@@ -30,23 +30,39 @@ class WeatherQueryParams(BaseModel):
     end_date: date = Field(..., description="End date (YYYY-MM-DD)")
 
 
+class LocationMeta(BaseModel):
+    id: str = Field(...,
+                    description="Unique short code string identifier (e.g., 'mnl')")
+    name: str = Field(..., description="Full human-readable display name of the city (e.g., 'Manila')")
+    # made optional so the /v1/locations endpoint doesn't have to emit coordinates if it doesn't want to
+    latitude: Optional[float] = Field(
+        None, description="Latitude coordinate center bound")
+    longitude: Optional[float] = Field(
+        None, description="Longitude coordinate center bound")
+
+
+class LocationListResponse(BaseModel):
+    locations: List[LocationMeta] = Field(
+        ..., description="Array containing all supported metadata locations")
+
+
 class WeatherResponse(BaseModel):
-    location_id: str = Field(...,
-                             description="The location's short unique code (e.g., 'mnl')")
-    location: str = Field(...,
-                          description="The location's full display name (e.g., 'Manila')")
-    latitude: float = Field(..., description="Latitude coordinate center")
-    longitude: float = Field(..., description="Longitude coordinate center")
+    location: LocationMeta = Field(...,
+                                   description="The location details for this dataset")
     data: List[WeatherDataPoint] = Field(...,
                                          description="Array of sorted hourly metrics")
 
 
-class LocationMetaData(BaseModel):
-    id: str = Field(...,
-                    description="Unique short code string identifier (e.g., 'mnl')")
-    name: str = Field(..., description="Full human-readable display name of the city (e.g., 'Manila')")
+class AnomalyPoint(BaseModel):
+    timestamp: datetime
+    value: float
+    bound_limit: float
 
 
-class LocationListResponse(BaseModel):
-    locations: List[LocationMetaData] = Field(
-        ..., description="Array containing all supported metadata locations")
+class AnomalyResponse(BaseModel):
+    """Uses composition to attach the unified location metadata block to anomaly data."""
+    location: LocationMeta = Field(...,
+                                   description="The location details for this dataset")
+    method: str = "IQR"
+    wind_speed_anomalies: List[AnomalyPoint]
+    radiation_anomalies: List[AnomalyPoint]

@@ -1,6 +1,6 @@
 from enum import Enum
 from pydantic import BaseModel, Field
-from datetime import datetime
+from datetime import date, datetime
 from typing import List
 
 
@@ -21,6 +21,24 @@ class WeatherDataPoint(BaseModel):
     timestamp: datetime
     wind_speed: float
     radiation: float
+
+
+class WeatherQueryParams(BaseModel):
+    location_id: AllowedLocations = Field(
+        ..., description="Location Id")
+    start_date: date = Field(..., description="Start date (YYYY-MM-DD)")
+    end_date: date = Field(..., description="End date (YYYY-MM-DD)")
+
+
+class WeatherResponse(BaseModel):
+    location_id: str = Field(...,
+                             description="The location's short unique code (e.g., 'mnl')")
+    location: str = Field(...,
+                          description="The location's full display name (e.g., 'Manila')")
+    latitude: float = Field(..., description="Latitude coordinate center")
+    longitude: float = Field(..., description="Longitude coordinate center")
+    data: List[WeatherDataPoint] = Field(...,
+                                         description="Array of sorted hourly metrics")
 
 
 class LocationMetaData(BaseModel):

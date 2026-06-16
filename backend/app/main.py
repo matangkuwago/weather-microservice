@@ -1,11 +1,19 @@
 import asyncio
 import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
-
-from app.database import engine, Base
+from fastapi import FastAPI, Depends
+from sqlalchemy.orm import Session
+from app.database import engine, Base, get_db
 from app.tasks import sync_weather_data
-from app.schemas import PREDEFINED_LOCATIONS, LocationMetaData, LocationListResponse
+from app.schemas import (
+    PREDEFINED_LOCATIONS,
+    LocationMetaData,
+    LocationListResponse,
+    WeatherQueryParams,
+    WeatherResponse,
+    WeatherDataPoint
+)
+from app.services import get_cached_weather
 
 
 # Logging configuration
@@ -54,3 +62,18 @@ async def get_supported_locations():
         for loc_id, details in PREDEFINED_LOCATIONS.items()
     ]
     return LocationListResponse(locations=meta_list)
+
+
+@app.get("/v1/weather-data", response_model=WeatherResponse)
+async def get_weather(params: WeatherQueryParams = Depends(), db: Session = Depends(get_db)):
+    location, records = await get_cached_weather(params, db)
+    data_points = [WeatherDataPoint(
+        timestamp=r.timestamp, wind_speed=r.wind_speed, radiation=r.radiation) for r in records]
+
+    return WeatherResponse(
+        location_id=location["location_id"],
+        location=location["name"],
+        latitude=location["latitude"],
+        longitude=location["longitude"],
+        data=data_points
+    )

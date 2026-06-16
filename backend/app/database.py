@@ -1,6 +1,8 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, UniqueConstraint
+from sqlalchemy import (
+    create_engine,
+    Column, Integer, String, Float, DateTime, UniqueConstraint
+)
 from sqlalchemy.orm import declarative_base, sessionmaker
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, UniqueConstraint
 
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///./data/weather.db"

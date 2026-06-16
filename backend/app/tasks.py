@@ -29,29 +29,27 @@ async def sync_weather_data():
             cutoff_datetime = datetime.combine(
                 today - history_delta, datetime.min.time())
 
-            # 1. Clean up stale entries older than your sliding history window (e.g., 30 days)
+            # Clean up stale entries older than your sliding history window
+            # Using delete() with filter is efficient in SQLAlchemy
             deleted_rows = db.query(WeatherData).filter(
-                WeatherData.timestamp < cutoff_datetime).delete()
+                WeatherData.timestamp < cutoff_datetime).delete(synchronize_session=False)
             if deleted_rows > 0:
                 logger.warning(
                     f"Purged {deleted_rows} historical records older than {settings.SYNC_HISTORY_DAYS} days.")
             db.commit()
 
-            # 2. Check the newest entry in the database to find the sync starting point
-            # This ensures that if the service is down for days, it catches up automatically on boot
+            # Check the newest entry in the database to find the sync starting point
             latest_saved_timestamp = db.query(
                 func.max(WeatherData.timestamp)).scalar()
 
             if latest_saved_timestamp:
-                # Start fetching from the day of the latest recorded data point
                 start_fetch_date = latest_saved_timestamp.date()
             else:
-                # If the database is completely empty, pull the full historical window
                 start_fetch_date = today - history_delta
 
             end_fetch_date = today
 
-            # 3. Trigger a single batched network call if updates are required
+            # Trigger a single batched network call if updates are required
             if start_fetch_date <= end_fetch_date:
                 logger.info(
                     f"Syncing gaps: Fetching data from {start_fetch_date} to {end_fetch_date} for all cities.")
@@ -60,15 +58,18 @@ async def sync_weather_data():
                 coord_list = [(PREDEFINED_LOCATIONS[lid]["lat"],
                                PREDEFINED_LOCATIONS[lid]["lon"]) for lid in loc_ids]
 
-                # Fetch clean, linear-interpolated data blocks
                 batch_api_data = await fetch_multi_location_weather(
                     coord_list, str(start_fetch_date), str(end_fetch_date)
                 )
 
-                # 4. Save missing hourly entries
                 inserted_count = 0
+
+                # Collect all new records in memory first, then add them in bulk
+                new_records = []
+
                 for loc_id, location_points in zip(loc_ids, batch_api_data):
                     for item in location_points:
+                        # Check existence efficiently
                         exists = db.query(WeatherData).filter(
                             WeatherData.location_id == loc_id,
                             WeatherData.timestamp == item.timestamp
@@ -81,12 +82,17 @@ async def sync_weather_data():
                                 wind_speed=item.wind_speed,
                                 radiation=item.radiation
                             )
-                            db.add(new_record)
+                            new_records.append(new_record)
                             inserted_count += 1
 
-                db.commit()
-                logger.info(
-                    f"Sync task complete. Successfully filled {inserted_count} missing hours into SQLite.")
+                # Bulk add to database
+                if new_records:
+                    db.add_all(new_records)
+                    db.commit()
+                    logger.info(
+                        f"Sync task complete. Successfully filled {inserted_count} missing hours into SQLite.")
+                else:
+                    logger.info("No new data to insert.")
 
         except asyncio.CancelledError:
             logger.info("Sync worker received a shutdown cancellation signal.")

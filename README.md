@@ -34,7 +34,7 @@ weather-service/
 ```
 
 ## ⏳ Data Synchronization
-The microservice runs an automated background worker (sync_weather_data) on a configurable schedule (SYNC_INTERVAL_SECONDS) to clean, repair, and cache historical weather data from Open-Meteo.com into an SQLite database.
+The microservice runs an automated background worker (`sync_weather_data`) on a configurable schedule (`SYNC_INTERVAL_SECONDS`) to clean, repair, and cache historical weather data from Open-Meteo.com into an SQLite database.
 
 ```text
 [ Trigger ] ──> Purge records older than rolling history threshold (30 days)
@@ -60,7 +60,7 @@ Here is why the Interquartile Range (IQR) method works much better than a Z-scor
 
 ## ⚡ Quick Start
 
-## 1. Configure the AI Agent Environment Variables
+### 1. Configure the AI Agent Environment Variables
 Create a file named `.env` in the root directory:
 
 ```bash
@@ -76,7 +76,7 @@ ANTHROPIC_API_KEY=sk-ant-xxxx...
 ANTHROPIC_MODEL=claude-3-5-sonnet-20241022
 ```
 
-## 2. Launch the Entire System Stack
+### 2. Launch the Entire System Stack
 Compile and trigger all three containers simultaneously from your main project folder root directory:
 
 ```bash
@@ -85,14 +85,14 @@ docker compose up --build -d
 
 If `AI_PROVIDER` is set to `ollama`, the system will automatically pull and initialize the 4.7 GB Qwen model inside the docker build phase.
 
-## 3. Verify System Infrastructure
+### 3. Verify System Infrastructure
 Open your browser to start exploring:
 
 * Interactive Dashboard: http://localhost:8501
 * FastAPI API Swagger Documentation Docs: http://localhost:8000/docs
 
 
-## 💬 Conversational Starters to Try in the Dashboard
+### 💬 Conversational Starters to Try in the Dashboard
 
 The AI Weather Assistant understands everyday language (like 'last week'), automatically converts it into exact dates, grabs the right data for multiple cities at once, and handles all the math for you.
 

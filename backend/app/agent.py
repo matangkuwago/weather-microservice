@@ -16,7 +16,7 @@ from app.schemas import PREDEFINED_LOCATIONS, WeatherDataPoint, WeatherQueryPara
 from app.services import detect_iqr_anomalies, get_cached_weather
 
 
-logger = logging.getLogger("weather-api")
+logger = logging.getLogger("weather-agent")
 
 
 def get_location_id(location_name: str) -> str:
@@ -211,8 +211,8 @@ def get_weather_agent_executor():
             f"You have access to tools to get weather records for {', '.join(locations)}. "
             "When users ask questions relative to time (like 'last week'), convert them to explicit YYYY-MM-DD parameters. "
             "When users ask questions about anomalies, pass the threshold factor if specified. "
-            "The default multiplier threshold is 1.5, but users can scale it up to 4.0 to isolate extreme outliers."
-            "Always invoke the get_weather_data and get_weather_anomalies tools to look up information before formulating your final answer."
+            "The default multiplier threshold is 1.5, but users can scale it up to 4.0 to isolate extreme outliers. "
+            "Always invoke the get_weather_data and get_weather_anomalies tools to look up information before formulating your final answer. "
         )),
         MessagesPlaceholder(variable_name="chat_history"),
         ("human", "{input}"),

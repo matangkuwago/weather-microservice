@@ -7,7 +7,7 @@ from typing import List, Tuple
 from app.schemas import WeatherDataPoint
 
 
-logger = logging.getLogger("weather-sync")
+logger = logging.getLogger("weather-open-meteo")
 
 
 def interpolate_series(values: List[float | None]) -> List[float]:

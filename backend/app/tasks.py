@@ -11,7 +11,7 @@ from app.open_meteo import fetch_multi_location_weather
 from app.schemas import PREDEFINED_LOCATIONS
 
 
-logger = logging.getLogger("weather-worker")
+logger = logging.getLogger("weather-tasks")
 
 
 async def sync_weather_data():

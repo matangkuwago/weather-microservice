@@ -14,9 +14,6 @@ from app.schemas import (
 )
 
 
-logger = logging.getLogger("weather-api")
-
-
 def get_cached_weather(
     params: WeatherQueryParams,
     db: Session

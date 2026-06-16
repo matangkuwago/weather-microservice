@@ -1,3 +1,4 @@
+import os
 import json
 import streamlit as st
 import requests
@@ -49,7 +50,7 @@ def apply_production_styles():
 apply_production_styles()
 st.title("🌦️ Weather Analytics & Anomaly Dashboard")
 
-BACKEND_URL = "http://backend:8000/v1"
+BACKEND_URL = os.getenv("BACKEND_URL", "http://backend:8000/v1")
 
 
 @st.cache_data(ttl=600)  # Cache the city list for 10 minutes

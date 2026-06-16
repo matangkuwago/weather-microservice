@@ -12,14 +12,32 @@ st.set_page_config(page_title="Weather Analytics Dashboard", layout="wide")
 
 
 def apply_production_styles():
-    """Injects custom CSS to hide the Streamlit Deploy link, header, and footer."""
+    """Removes top whitespace while keeping the sidebar toggle icon functional."""
     st.markdown(
         """
         <style>
+        /* 1. Remove the huge empty vertical spacing container margin */
+        .block-container {
+            padding-top: 1.5rem !important;
+            padding-bottom: 0rem !important;
+        }
+        
+        /* 2. Make the header background transparent so it doesn't create whitespace,
+              but DO NOT hide it completely so the toggle button stays interactive */
+        header {
+            background-color: rgba(0,0,0,0) !important;
+        }
+
+        /* 3. Force the sidebar reopen button to stay visible on top of everything */
+        [data-testid="stSidebarCollapseButton"] {
+            visibility: visible !important;
+        }
+
+        /* 4. Hide the Deploy button and clean up remaining elements */
         .stDeployButton {
             display: none !important;
         }
-        #MainMenu, footer, header {
+        #MainMenu, footer {
             visibility: hidden !important;
         }
         </style>

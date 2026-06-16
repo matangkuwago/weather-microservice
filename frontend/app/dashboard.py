@@ -6,6 +6,10 @@ import pandas as pd
 import plotly.graph_objects as go
 from datetime import date, timedelta
 
+
+BACKEND_URL = os.getenv("BACKEND_URL", "http://backend:8000/v1")
+
+
 # ==========================================
 # PAGE CONFIG & CSS INJECTION
 # ==========================================
@@ -50,8 +54,6 @@ def apply_production_styles():
 apply_production_styles()
 st.title("🌦️ Weather Analytics & Anomaly Dashboard")
 
-BACKEND_URL = os.getenv("BACKEND_URL", "http://backend:8000/v1")
-
 
 @st.cache_data(ttl=600)  # Cache the city list for 10 minutes
 def fetch_supported_locations():
@@ -78,14 +80,14 @@ st.sidebar.header("Data Controls")
 
 if supported_locations:
     location_map = {loc["name"]: loc["id"] for loc in supported_locations}
-    selected_name = st.sidebar.selectbox(
+    selected_location = st.sidebar.selectbox(
         "Select Location",
         options=list(location_map.keys())
     )
-    location_id = location_map[selected_name]
+    location_id = location_map[selected_location]
 else:
     st.sidebar.warning("Using fallback static location mapping...")
-    selected_name = st.sidebar.selectbox("Select Location", ["Manila"])
+    selected_location = st.sidebar.selectbox("Select Location", ["Manila"])
     location_id = "mnl"
 
 # Default to the last 30 days
@@ -142,28 +144,33 @@ raw_data, anomaly_data = fetch_weather_and_anomalies(
     location_id, start_date, end_date, threshold)
 
 # ==========================================
-# VISUALIZATION & DATA RENDERING (Unified View)
+# VISUALIZATION & DATA RENDERING (Unified Single Column)
 # ==========================================
 if raw_data and anomaly_data:
+    # convert hourly data payload to pandas DataFrame
     df = pd.DataFrame(raw_data["data"])
-    df["timestamp"] = pd.to_datetime(df["timestamp"])
 
-    wind_anoms = pd.DataFrame(anomaly_data["wind_speed_anomalies"])
-    rad_anoms = pd.DataFrame(anomaly_data["radiation_anomalies"])
+    if df.empty:
+        st.warning(
+            f"⚠️ No weather records found for {selected_location} "
+            f"between {start_date} and {end_date}. "
+            "Please select a different date range or wait for the background sync task to fetch it."
+        )
+    else:
+        df["timestamp"] = pd.to_datetime(df["timestamp"])
 
-    if not wind_anoms.empty:
-        wind_anoms["timestamp"] = pd.to_datetime(wind_anoms["timestamp"])
-    if not rad_anoms.empty:
-        rad_anoms["timestamp"] = pd.to_datetime(rad_anoms["timestamp"])
+        wind_anoms = pd.DataFrame(anomaly_data["wind_speed_anomalies"])
+        rad_anoms = pd.DataFrame(anomaly_data["radiation_anomalies"])
 
-    # 1. Split page into 2 side-by-side columns: Charts (2/3 width) and Chat (1/3 width)
-    chart_column, chat_column = st.columns([2, 1], gap="large")
+        if not wind_anoms.empty:
+            wind_anoms["timestamp"] = pd.to_datetime(wind_anoms["timestamp"])
+        if not rad_anoms.empty:
+            rad_anoms["timestamp"] = pd.to_datetime(rad_anoms["timestamp"])
 
-    # ------------------------------------------
-    # LEFT COLUMN: METRICS & TIME-SERIES CHARTS
-    # ------------------------------------------
-    with chart_column:
-        st.subheader(f"📊 Analytics Summary for {selected_name}")
+        # ------------------------------------------
+        # SECTION 1: METRICS & TIME-SERIES CHARTS
+        # ------------------------------------------
+        st.subheader(f"📊 Analytics Summary for {selected_location}")
 
         col1, col2 = st.columns(2)
         col1.metric("Max Wind Speed", f"{df['wind_speed'].max():.1f} km/h")
@@ -181,7 +188,7 @@ if raw_data and anomaly_data:
                 marker=dict(color='crimson', size=10, symbol='x')
             ))
         fig_wind.update_layout(xaxis_title="Timestamp", yaxis_title="km/h",
-                               height=280, margin=dict(l=10, r=10, t=10, b=10))
+                               height=320, margin=dict(l=10, r=10, t=10, b=10))
         st.plotly_chart(fig_wind, use_container_width=True)
 
         # Solar Radiation Chart
@@ -196,76 +203,70 @@ if raw_data and anomaly_data:
                 marker=dict(color='crimson', size=10, symbol='x')
             ))
         fig_rad.update_layout(xaxis_title="Timestamp", yaxis_title="W/m²",
-                              height=280, margin=dict(l=10, r=10, t=10, b=10))
+                              height=320, margin=dict(l=10, r=10, t=10, b=10))
         st.plotly_chart(fig_rad, use_container_width=True)
 
     # ------------------------------------------
-    # RIGHT COLUMN: LIVE AI CHAT ASSISTANT
+    # SECTION 2: LIVE AI CHAT ASSISTANT
     # ------------------------------------------
-    with chat_column:
-        st.subheader("💬 AI Weather Assistant")
-        st.write(
-            "Ask questions about anomalies, historical trends, or math summaries.")
+    # Keeping the chat assistant active below the graphs so users can still
+    # converse with the model even if the primary charts are empty.
+    st.markdown("---")
+    st.subheader("💬 AI Weather Assistant")
+    st.write("Ask questions about anomalies, historical trends, or math summaries.")
 
-        # Fixed scrollable container window for the chat history log
-        chat_container = st.container(height=520)
+    chat_container = st.container(height=450)
 
-        if "messages" not in st.session_state:
-            st.session_state.messages = []
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+
+    with chat_container:
+        for msg in st.session_state.messages:
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
+
+    if user_query := st.chat_input("Ask a question about the weather data..."):
+        with chat_container:
+            with st.chat_message("user"):
+                st.markdown(user_query)
+        st.session_state.messages.append(
+            {"role": "user", "content": user_query})
 
         with chat_container:
-            for msg in st.session_state.messages:
-                with st.chat_message(msg["role"]):
-                    st.markdown(msg["content"])
+            with st.chat_message("assistant"):
+                response_placeholder = st.empty()
+                full_raw_response = ""
+                clean_reply = ""
 
-        if user_query := st.chat_input("Ask a question about the weather data..."):
-            with chat_container:
-                with st.chat_message("user"):
-                    st.markdown(user_query)
-            st.session_state.messages.append(
-                {"role": "user", "content": user_query})
+                try:
+                    res = requests.post(
+                        f"{BACKEND_URL}/chat", json={"message": user_query}, stream=True)
 
-            with chat_container:
-                with st.chat_message("assistant"):
-                    response_placeholder = st.empty()
-                    full_raw_response = ""
-                    clean_reply = ""
+                    for chunk in res.iter_content(chunk_size=None, decode_unicode=True):
+                        if chunk:
+                            full_raw_response += chunk
+
+                            try:
+                                parsed = json.loads(full_raw_response)
+                                display_text = parsed.get(
+                                    "reply", full_raw_response)
+                            except json.JSONDecodeError:
+                                display_text = full_raw_response
+
+                            response_placeholder.markdown(display_text + "▌")
 
                     try:
-                        res = requests.post(
-                            f"{BACKEND_URL}/chat", json={"message": user_query}, stream=True)
+                        final_parsed = json.loads(full_raw_response)
+                        clean_reply = final_parsed.get(
+                            "reply", full_raw_response)
+                    except json.JSONDecodeError:
+                        clean_reply = full_raw_response
 
-                        for chunk in res.iter_content(chunk_size=None, decode_unicode=True):
-                            if chunk:
-                                full_raw_response += chunk
+                    response_placeholder.markdown(clean_reply)
+                except Exception as e:
+                    st.error(f"Failed to communicate with AI agent: {e}")
+                    clean_reply = "Sorry, I am having trouble connecting to my brain right now."
+                    response_placeholder.markdown(clean_reply)
 
-                                # On-the-fly streaming text decoder to unwrap JSON objects progressively
-                                try:
-                                    parsed = json.loads(full_raw_response)
-                                    display_text = parsed.get(
-                                        "reply", full_raw_response)
-                                except json.JSONDecodeError:
-                                    display_text = full_raw_response
-
-                                response_placeholder.markdown(
-                                    display_text + "▌")
-
-                        # Complete extraction parsing block once stream terminates
-                        try:
-                            final_parsed = json.loads(full_raw_response)
-                            clean_reply = final_parsed.get(
-                                "reply", full_raw_response)
-                        except json.JSONDecodeError:
-                            clean_reply = full_raw_response
-
-                        response_placeholder.markdown(clean_reply)
-                    except Exception as e:
-                        st.error(f"Failed to communicate with AI agent: {e}")
-                        clean_reply = "Sorry, I am having trouble connecting to the AI agent right now."
-                        response_placeholder.markdown(clean_reply)
-
-            st.session_state.messages.append(
-                {"role": "assistant", "content": clean_reply})
-else:
-    st.error(
-        f"Could not fetch data from the FastAPI microservice backend. Ensure your backend server is active at {BACKEND_URL}.")
+        st.session_state.messages.append(
+            {"role": "assistant", "content": clean_reply})

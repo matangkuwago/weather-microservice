@@ -30,6 +30,7 @@ services:
       dockerfile: Dockerfile.Ollama
       args:
         - AI_PROVIDER=${AI_PROVIDER:-ollama}
+        - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen2.5:7b}
     container_name: weather_ollama
     ports:
       - "11434:11434"

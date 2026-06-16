@@ -20,11 +20,13 @@ weather-service/
 │       ├── schemas.py       # Pydantic validation envelopes
 │       ├── tasks.py         # Data download background task
 │       ├── services.py      # Local data query service
+│       ├── open_meteo.py    # Module for getting data from Open-Meteo.com
+│       ├── agent.py         # Module for AI Agent orchestration
 └── frontend/
     ├── Dockerfile.dashboard # Streamlit isolated image layer
     ├── requirements.txt     # Package requirements for the frontend
     └── app/
-        └── dashboard.py     # Side-by-side visualization & chat UI
+        └── dashboard.py     # Side-by-side data visualization & chat UI
 ```
 
 ## ⏳ Data Synchronization

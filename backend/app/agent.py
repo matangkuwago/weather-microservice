@@ -211,6 +211,8 @@ def get_weather_agent_executor():
             f"You have access to tools to get weather records for {', '.join(locations)}. "
             "When users ask questions relative to time (like 'last week'), convert them to explicit YYYY-MM-DD parameters. "
             "When users ask questions about anomalies, pass the threshold factor if specified. "
+            "When users ask questions about time, note that the timestamps returned by tools are in UTC. "
+            "Always convert these timestamps into the user's local timezone when formulating your final response. "
             "The default multiplier threshold is 1.5, but users can scale it up to 4.0 to isolate extreme outliers. "
             "Always invoke the get_weather_data and get_weather_anomalies tools to look up information before formulating your final answer. "
         )),

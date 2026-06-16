@@ -87,7 +87,12 @@ end_date = st.sidebar.date_input(
 )
 
 threshold = st.sidebar.slider(
-    "IQR Anomaly Threshold (Factor)", 1.0, 3.0, 1.5, 0.1)
+    label="IQR Anomaly Threshold (Factor)",
+    min_value=1.0,
+    max_value=4.0,     # Extended upper limit for extreme outlier filtering
+    value=1.5,         # Standard default Tukey outlier baseline
+    step=0.1
+)
 
 if start_date > end_date:
     st.sidebar.error("Error: Start date must be before end date.")

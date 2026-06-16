@@ -17,8 +17,6 @@ from app.services import detect_iqr_anomalies, get_cached_weather
 
 logger = logging.getLogger("weather-api")
 
-# Define the weather data tools the AI agent can execute
-
 
 def get_location_id(location_name: str) -> str:
     location_id = next(
@@ -28,6 +26,8 @@ def get_location_id(location_name: str) -> str:
     )
     return location_id
 
+
+# The weather data tools the AI agent can execute
 
 @tool
 def get_weather_data(location_name: str, start_date: str, end_date: str) -> Dict[str, Any]:
@@ -102,6 +102,9 @@ def get_weather_data(location_name: str, start_date: str, end_date: str) -> Dict
 def get_weather_anomalies(location_name: str, start_date: str, end_date: str, threshold: float = 1.5) -> Dict[str, Any]:
     """
     Finds IQR anomalies for wind or solar radiation for a specific date range and location.
+    - location: Must be one of the names in PREDEFINED_LOCATIONS
+    - start_date: Format 'YYYY-MM-DD'
+    - end_date: Format 'YYYY-MM-DD'
     """
 
     try:

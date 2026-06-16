@@ -1,8 +1,10 @@
-import numpy as np
 import logging
+import numpy as np
+
 from datetime import datetime, time
-from sqlalchemy.orm import Session
 from typing import List, Tuple, Dict
+from sqlalchemy.orm import Session
+
 from app.database import WeatherData
 from app.schemas import (
     PREDEFINED_LOCATIONS,
@@ -10,10 +12,6 @@ from app.schemas import (
     WeatherDataPoint,
     AnomalyPoint
 )
-from langchain_anthropic import ChatAnthropic
-from langchain_ollama import ChatOllama
-from langchain_openai import ChatOpenAI
-from app.config import settings
 
 
 logger = logging.getLogger("weather-api")

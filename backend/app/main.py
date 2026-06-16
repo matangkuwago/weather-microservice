@@ -1,8 +1,10 @@
-import asyncio
 import logging
+import asyncio
+
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
+
 from app.database import engine, Base, get_db
 from app.tasks import sync_weather_data
 from app.schemas import (

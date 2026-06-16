@@ -1,8 +1,11 @@
-import httpx
 import logging
+import httpx
+
 from fastapi import HTTPException
 from typing import List, Tuple
+
 from app.schemas import WeatherDataPoint
+
 
 logger = logging.getLogger("weather-sync")
 

@@ -82,3 +82,25 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     reply: str
+
+
+class WeatherSummary(BaseModel):
+    location: str
+    location_id: str
+    analysis_period: dict
+    summary: dict
+    hourly_data: List[dict]
+
+
+class AnomalyReport(BaseModel):
+    location: str
+    location_id: str
+    analysis_period: dict
+    method: str
+    summary: dict
+    wind_speed_anomalies: List[dict]
+    radiation_anomalies: List[dict]
+
+
+class ToolError(BaseModel):
+    error: str

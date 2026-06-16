@@ -1,6 +1,5 @@
 import logging
 from datetime import datetime
-from typing import Any, Dict
 
 from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -12,7 +11,14 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import SessionLocal
-from app.schemas import PREDEFINED_LOCATIONS, WeatherDataPoint, WeatherQueryParams
+from app.schemas import (
+    PREDEFINED_LOCATIONS,
+    WeatherDataPoint,
+    WeatherQueryParams,
+    WeatherSummary,
+    AnomalyReport,
+    ToolError
+)
 from app.services import detect_iqr_anomalies, get_cached_weather
 
 
@@ -31,7 +37,7 @@ def get_location_id(location_name: str) -> str:
 # The weather data tools the AI agent can execute
 
 @tool
-def get_weather_data(location_name: str, start_date: str, end_date: str) -> Dict[str, Any]:
+def get_weather_data(location_name: str, start_date: str, end_date: str) -> WeatherSummary | ToolError:
     """
     Fetches raw wind speed and solar radiation metrics for a given location and date range.
     - location: Must be one of the names in PREDEFINED_LOCATIONS
@@ -58,10 +64,8 @@ def get_weather_data(location_name: str, start_date: str, end_date: str) -> Dict
             location_meta, records = get_cached_weather(params, db)
 
             if not records:
-                return {
-                    "location": location_meta["name"],
-                    "message": f"No data found in the database for the period {start_date} to {end_date}."
-                }
+                location_name = location_meta["name"]
+                return ToolError(error=f"No data found in the database from {start_date} to {end_date} for location '{location_name}'.")
 
             # Compute high-level statistical summaries to save LLM reasoning tokens
             # This prevents the AI from making simple math or averaging errors
@@ -72,11 +76,11 @@ def get_weather_data(location_name: str, start_date: str, end_date: str) -> Dict
             avg_rad = sum(radiations) / len(radiations)
 
             # Format the unified flat response payload for the LLM Agent
-            return {
-                "location": location_meta["name"],
-                "location_id": location_id,
-                "analysis_period": {"start": start_date, "end": end_date},
-                "summary": {
+            return WeatherSummary(
+                location=location_meta["name"],
+                location_id=location_id,
+                analysis_period={"start": start_date, "end": end_date},
+                summary={
                     "total_hours_retrieved": len(records),
                     "average_wind_speed_kmh": round(avg_wind, 2),
                     "max_wind_speed_kmh": round(max(wind_speeds), 2),
@@ -84,7 +88,7 @@ def get_weather_data(location_name: str, start_date: str, end_date: str) -> Dict
                     "max_solar_radiation_wm2": round(max(radiations), 2)
                 },
                 # Detailed time-series array mapping
-                "hourly_data": [
+                hourly_data=[
                     {
                         "timestamp": r.timestamp.isoformat(),
                         "wind_speed": r.wind_speed,
@@ -92,15 +96,16 @@ def get_weather_data(location_name: str, start_date: str, end_date: str) -> Dict
                     }
                     for r in records
                 ]
-            }
+            )
         finally:
             db.close()
     except Exception as e:
-        return {"error": f"Failed to retrieve data: {str(e)}"}
+        logger.error(f"get_weather_data failed: {e}")
+        return ToolError(error=f"Failed to retrieve data: {str(e)}")
 
 
 @tool
-def get_weather_anomalies(location_name: str, start_date: str, end_date: str, threshold: float = 1.5) -> Dict[str, Any]:
+def get_weather_anomalies(location_name: str, start_date: str, end_date: str, threshold: float = 1.5) -> AnomalyReport | ToolError:
     """
     Finds IQR anomalies for wind or solar radiation for a specific date range and location.
     - location: Must be one of the names in PREDEFINED_LOCATIONS
@@ -114,7 +119,9 @@ def get_weather_anomalies(location_name: str, start_date: str, end_date: str, th
         if not location_id:
             allowed_names = ", ".join([v["name"]
                                       for v in PREDEFINED_LOCATIONS.values()])
-            return {"error": f"Location '{location_name}' is not supported. Choose from: {allowed_names}"}
+            return ToolError(error=f"Location '{location_name}' is not supported. "
+                             f"Choose from: {allowed_names}"
+                             )
 
         params = WeatherQueryParams(
             location_id=location_id,
@@ -128,41 +135,40 @@ def get_weather_anomalies(location_name: str, start_date: str, end_date: str, th
             location_meta, records = get_cached_weather(params, db)
 
             if not records:
-                return {
-                    "location": location_meta["name"],
-                    "message": f"No data found in the database for the period {start_date} to {end_date}."
-                }
+                location_name = location_meta["name"]
+                return ToolError(error=f"No data found in the database from {start_date} to {end_date} for location '{location_name}'.")
 
             data_points = [WeatherDataPoint(
                 timestamp=r.timestamp, wind_speed=r.wind_speed, radiation=r.radiation) for r in records]
             anomalies = detect_iqr_anomalies(data_points, factor=threshold)
 
-            return {
-                "location": location_meta["name"],
-                "location_id": location_id,
-                "analysis_period": {"start": start_date, "end": end_date},
-                "method": f"IQR (threshold factor: {threshold})",
-                "summary": {
+            return AnomalyReport(
+                location=location_meta["name"],
+                location_id=location_id,
+                analysis_period={"start": start_date, "end": end_date},
+                method=f"IQR (threshold factor: {threshold})",
+                summary={
                     "total_hours_analyzed": len(records),
                     "wind_speed_anomalies_count": len(anomalies["wind_speed"]),
                     "radiation_anomalies_count": len(anomalies["radiation"])
                 },
                 # Return mapped JSON-friendly lists for the AI to print out or trace
-                "wind_speed_anomalies": [
+                wind_speed_anomalies=[
                     {"timestamp": item.timestamp.isoformat(
                     ), "observed_value": item.value, "limit_bound": item.bound_limit}
                     for item in anomalies["wind_speed"]
                 ],
-                "radiation_anomalies": [
+                radiation_anomalies=[
                     {"timestamp": item.timestamp.isoformat(
                     ), "observed_value": item.value, "limit_bound": item.bound_limit}
                     for item in anomalies["radiation"]
                 ]
-            }
+            )
         finally:
             db.close()
     except Exception as e:
-        return {"error": f"Failed to retrieve data: {str(e)}"}
+        logger.error(f"get_weather_anomalies failed: {e}")
+        return ToolError(error=f"Failed to retrieve data: {str(e)}")
 
 
 #  Build the Agent Executor Instance

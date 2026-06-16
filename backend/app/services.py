@@ -21,8 +21,23 @@ def get_cached_weather(
     """
     Pure cache-read service. Queries the local SQLite database instantly.
     Contains zero external network fallback code.
+
+    Args:
+        params: Query parameters including location_id and date range.
+        db: SQLAlchemy session.
+
+    Returns:
+        A tuple containing location metadata and a list of weather records.
+
+    Raises:
+        KeyError: If the location_id is not found in PREDEFINED_LOCATIONS.
     """
+
     loc_id = params.location_id
+    if loc_id not in PREDEFINED_LOCATIONS:
+        raise KeyError(
+            f"Location ID {loc_id} not found in predefined locations.")
+
     coords = PREDEFINED_LOCATIONS[loc_id]
 
     start_dt = datetime.combine(params.start_date, time.min)
@@ -46,7 +61,25 @@ def get_cached_weather(
     return location_meta, records
 
 
-def detect_iqr_anomalies(data: List[WeatherDataPoint], factor: float = 1.5) -> Dict[str, List[AnomalyPoint]]:
+def detect_iqr_anomalies(
+        data: List[WeatherDataPoint],
+        factor: float = 1.5
+) -> Dict[str, List[AnomalyPoint]]:
+    """
+    Detects anomalies in wind speed and radiation data using the Interquartile Range (IQR) method.
+
+    Logic:
+        Lower Bound = Q1 - (factor * IQR)
+        Upper Bound = Q3 + (factor * IQR)
+
+    Args:
+        data: List of WeatherDataPoint objects.
+        factor: Multiplier for the IQR (default 1.5 is standard for mild outliers).
+
+    Returns:
+        A dictionary with keys 'wind_speed' and 'radiation', each containing a list of AnomalyPoint.
+        Returns empty lists if input data is empty.
+    """
     if not data:
         return {"wind_speed": [], "radiation": []}
 

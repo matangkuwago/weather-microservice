@@ -67,13 +67,12 @@ Create a file named `.env` in the root directory:
 AI_PROVIDER=ollama
 OLLAMA_MODEL=qwen2.5:7b
 
-# Data Configuration Boundaries
-SYNC_HISTORY_DAYS=30
-SYNC_INTERVAL_SECONDS=86400
-
-# Cloud API Tokens (Only required if AI_PROVIDER is set to cloud profiles)
+# Cloud API Tokens and models (Only required if AI_PROVIDER is set to cloud profiles)
 OPENAI_API_KEY=sk-proj-xxxx...
+OPENAI_MODEL=gpt-4o
+
 ANTHROPIC_API_KEY=sk-ant-xxxx...
+ANTHROPIC_MODEL=claude-3-5-sonnet-20241022
 ```
 
 ## 2. Launch the Entire System Stack
@@ -83,7 +82,7 @@ Compile and trigger all three containers simultaneously from your main project f
 docker compose up --build -d
 ```
 
-If AI_PROVIDER is set to ollama, the system will automatically pull and initialize the 4.7 GB Qwen model inside the docker build phase.
+If `AI_PROVIDER` is set to `ollama`, the system will automatically pull and initialize the 4.7 GB Qwen model inside the docker build phase.
 
 ## 3. Verify System Infrastructure
 Open your browser to start exploring:

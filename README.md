@@ -27,14 +27,19 @@ weather-service/
         └── dashboard.py     # Side-by-side visualization & chat UI
 ```
 
-## 🔬 Algorithmic Selection: Why IQR Instead of Z-Score?
-Here is why the Interquartile Range (IQR) method works much better than a Z-score for tracking wind and solar data:
+## ⏳ Data Synchronization
+The microservice runs an automated background worker (sync_weather_data) on a configurable schedule (SYNC_INTERVAL_SECONDS) to clean, repair, and cache historical weather data from Open-Meteo.com into an SQLite database.
 
 ```text
-[ Distribution ] ──> Wind/Solar are heavily skewed (Non-Gaussian)
-[ Z-Score Tool ] ──> Mean/StdDev get distorted by extreme peaks (Self-Blinding)
-[ IQR Engine   ] ──> Percentiles stay locked to the central 50% (Robust Filtering)
+[ Trigger ] ──> Purge records older than rolling history threshold (30 days)
+[ Analysis] ──> Query SQLite for the latest cached timestamp to identify missing gaps
+[ Request ] ──> Fetch all location data from Open-Meteo.com in a single network call
+[ Cleanse ] ──> Run linear series interpolation for missing values & clip bounds
+[ Write   ] ──> Filter out timestamps existing in the database and save the new updates
 ```
+
+## 🔬 Anomaly Algorithmic Selection: Why IQR Instead of Z-Score?
+Here is why the Interquartile Range (IQR) method works much better than a Z-score for tracking wind and solar data:
 
 *   **Works on Real-World Weather Patterns**
     *   Z-score only works if your data is perfectly symmetrical.

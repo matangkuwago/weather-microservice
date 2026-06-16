@@ -181,20 +181,20 @@ def get_llm_provider():
         return ChatOllama(
             base_url=settings.OLLAMA_BASE_URL,
             model=settings.OLLAMA_MODEL,
-            temperature=0
+            temperature=settings.AI_TEMPERATURE
         )
     elif settings.AI_PROVIDER == "openai":
         logger.info(f"Creating a ChatOpenAI provider.")
         return ChatOpenAI(
             model=settings.OPENAI_MODEL,
-            temperature=0,
+            temperature=settings.AI_TEMPERATURE,
             api_key=settings.OPENAI_API_KEY
         )
     elif settings.AI_PROVIDER == "anthropic":
         logger.info(f"Creating a ChatAnthropic provider.")
         return ChatAnthropic(
             model=settings.ANTHROPIC_MODEL,
-            temperature=0,
+            temperature=settings.AI_TEMPERATURE,
             api_key=settings.ANTHROPIC_API_KEY
         )
     else:

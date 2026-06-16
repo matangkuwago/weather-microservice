@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     OLLAMA_BASE_URL: str = "http://ollama:11434"
     OPENAI_API_KEY: str = ""
     ANTHROPIC_API_KEY: str = ""
+    AI_TEMPERATURE: float = 0
 
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="ignore")

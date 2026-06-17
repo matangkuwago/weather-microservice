@@ -1,39 +1,16 @@
-## 🌦️ Weather Analytics & Local AI Agent Microservice
+# 🌦️ Weather Analytics Microservice with AI Assistant
 
 A containerized, lightweight weather analytics platform built with FastAPI and Streamlit. 
 
-The system maintains a rolling database cache of the past 30 days. It tracks hourly wind speed and solar radiation for Manila, Tokyo, and New York. All historical data comes from the Open-Meteo Archive API.
+## 🧠 Core Features
 
-The system uses an Interquartile Range (IQR) pipeline to find anomalies. It also includes an AI Chat Assistant. The assistant automatically runs backend tool calls to summarize data and pinpoint weather extremes.
+The system maintains a rolling 30-day database cache tracking hourly wind speed and solar radiation metrics for Manila, Tokyo, and New York. All historical data is pulled directly from [Open-Meteo Archive API](https://open-meteo.com/en/docs/historical-weather-api).
 
+The system uses the Interquartile Range (IQR) method to automatically find and filter unusual spikes in weather data. It also features an AI assistant that chats naturally, pulls local data, and highlights weather extremes.
 
-## 🛠️ System Architecture & Layout
-The project enforces a separation of concerns, decoupling the frontend interface and backend services.
+### ⏳ Data Synchronization
 
-```text
-weather-service/
-├── docker-compose.yml       # Multi-container service orchestrator
-├── backend/
-│   ├── Dockerfile           # Backend container build instructions
-│   ├── requirements.txt     # Package requirements for the backend
-│   └── app/
-│       ├── main.py          # FastAPI application server & routes
-│       ├── config.py        # Settings class
-│       ├── database.py      # SQLite connection & engine setup and SQLAlchemy data mapping
-│       ├── schemas.py       # Pydantic validation envelopes
-│       ├── tasks.py         # Data download background task
-│       ├── services.py      # Local data query service
-│       ├── open_meteo.py    # Module for getting data from Open-Meteo.com
-│       ├── agent.py         # Module for AI Agent orchestration
-└── frontend/
-    ├── Dockerfile.dashboard # Streamlit isolated image layer
-    ├── requirements.txt     # Package requirements for the frontend
-    └── app/
-        └── dashboard.py     # Side-by-side data visualization & chat UI
-```
-
-## ⏳ Data Synchronization
-The microservice runs an automated background worker (`sync_weather_data`) on a configurable schedule (`SYNC_INTERVAL_SECONDS`) to clean, repair, and cache historical weather data from Open-Meteo.com into an SQLite database.
+The backend runs an automated background worker (`sync_weather_data`) on a configurable interval (`SYNC_INTERVAL_SECONDS`). It automatically downloads, repairs, and saves historical Open-Meteo data into a local SQLite database.
 
 ```text
 [ Trigger ] ──> Purge records older than rolling history threshold (30 days)
@@ -43,8 +20,8 @@ The microservice runs an automated background worker (`sync_weather_data`) on a 
 [ Write   ] ──> Filter out timestamps existing in the database and save the new updates
 ```
 
-## 🔬 Anomaly Algorithmic Selection: Why IQR Instead of Z-Score?
-Here is why the Interquartile Range (IQR) method works much better than a Z-score for tracking wind and solar data:
+### 🔬 Anomaly Algorithmic Selection: Why IQR Instead of Z-Score?
+Advantages of using the IQR method over Z-scores for this project:
 
 *   **Works on Real-World Weather Patterns**
     *   Z-score only works if your data is perfectly symmetrical.
@@ -56,46 +33,98 @@ Here is why the Interquartile Range (IQR) method works much better than a Z-scor
     *   IQR protects your thresholds by focusing exclusively on the normal middle 50% of your data.
     *   This ensures your baseline limits aren't ruined by a single crazy sensor error or a passing storm.
 
+## 🛠️ System Architecture & Layout
+The project enforces a separation of concerns, decoupling the frontend interface and backend services.
+
+```mermaid
+graph LR
+    %% Styling Definitions
+    classDef ui fill:#3498db,stroke:#2980b9,stroke-width:2px,color:#fff;
+    classDef api fill:#2ecc71,stroke:#27ae60,stroke-width:2px,color:#fff;
+    classDef ai fill:#9b59b6,stroke:#8e44ad,stroke-width:2px,color:#fff;
+    classDef db fill:#f1c40f,stroke:#f39c12,stroke-width:2px,color:#2c3e50;
+
+    %% Components
+    UI[Streamlit Frontend]:::ui
+    API[FastAPI Backend]:::api
+    LLM[AI Engine]:::ai
+    DB[(SQLite Cache)]:::db
+
+    %% Data and Chat Flow
+    UI -->|1. Sends Data Queries & Chat Prompts| API
+    API -->|2. Formats Prompts with Tools| LLM
+    LLM -->|3. Returns Response or Tool Request| API
+    API <-->|4. Reads / Writes Weather Data| DB
+    API -->|5. Returns Structured Data & Answers| UI
+```
+
+#### 📂 Project Structure
+| File | Description |
+| :--- | :--- |
+| `frontend/dashboard.py` | Streamlit UI for charts and chat widget. |
+| `backend/main.py` | FastAPI entry point and routing logic. |
+| `backend/agent.py` | Orchestrates the AI engine, system prompts, and tool selection. |
+| `backend/services.py` | Core logic for data gap checking, interpolation, and metrics. |
+| `backend/tasks.py` | Cron-like background scripts for pruning and fetching data. |
+| `backend/database.py` | SQLAlchemy engine connections and schema models. |
 
 ## ⚡ Quick Start
 
-### 1. Configure the AI Agent Environment Variables
-Create a file named `.env` in the root directory:
+### Prerequisites
+Make sure you have [Docker](https://docker.com) and Docker Compose installed on your system.
 
+### Running Locally
+
+#### 1. Clone the Repository
 ```bash
-# Choose between: ollama, openai, or anthropic
+git clone https://github.com/matangkuwago/weather-microservice.git
+cd weather-microservice
+```
+
+#### 2. Configure Environment Variables
+Create a file named `.env` in the root directory of the project and define your configuration settings:
+
+**Option A: Local Ollama (Recommended for Privacy & Cost)**
+```bash
 AI_PROVIDER=ollama
-
-# Fill out these variables if using a local Ollama service
 OLLAMA_BASE_URL=http://host.docker.internal:11434
+# Ensure the model is pulled locally first: ollama pull qwen3.5:9b
 OLLAMA_MODEL=qwen3.5:9b
+```
 
+**Option B: Cloud APIs**
 
-# Cloud API Tokens and models (Only required if AI_PROVIDER is set to openai or anthropic)
+**For OpenAI**
+```bash
+AI_PROVIDER=openai # or anthropic
 OPENAI_API_KEY=sk-proj-xxxx...
 OPENAI_MODEL=gpt-4o
+```
 
+**For Anthropic**
+```bash
+AI_PROVIDER=anthropic
 ANTHROPIC_API_KEY=sk-ant-xxxx...
 ANTHROPIC_MODEL=claude-sonnet-4-6
 ```
 
-### 2. Launch the Entire System Stack
-Compile and trigger all three containers simultaneously from your main project folder root directory:
-
+#### 3. Spin Up the Services
 ```bash
-docker compose up --build -d
+# create the data directory
+mkdir -p data
+
+# launch the containers
+docker-compose up --build
 ```
 
-### 3. Verify System Infrastructure
-Open your browser to start exploring:
-
-* Interactive Dashboard: http://localhost:8501
-* FastAPI API Swagger Documentation Docs: http://localhost:8000/docs
-
+#### 4. Access the Applications
+Once the build completes and the services are running, open your browser to access:
+* **Streamlit Dashboard UI**: [http://localhost:8501](http://localhost:8501)
+* **FastAPI Interactive API Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
 
 ### 💬 Conversational Starters to Try in the Dashboard
 
-The AI Weather Assistant understands everyday language (like 'last week'), automatically converts it into exact dates, grabs the right data for multiple cities at once, and handles all the math for you.
+The assistant provides a conversational interface specialized for local weather analytics, allowing users to query and analyze historical metrics across multiple cities using natural language.
 
 * “Which site had the highest average solar radiation last week?”
 * “Were there any extreme wind speed anomalies detected in Manila between June 1st and June 10th? Use an IQR factor threshold of 2.5.”

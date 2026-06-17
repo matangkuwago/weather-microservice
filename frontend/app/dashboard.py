@@ -187,7 +187,7 @@ if raw_data and anomaly_data:
                 mode='markers', name='IQR Anomaly',
                 marker=dict(color='crimson', size=10, symbol='x')
             ))
-        fig_wind.update_layout(xaxis_title="Timestamp", yaxis_title="km/h",
+        fig_wind.update_layout(xaxis_title="Timestamp (UTC)", yaxis_title="km/h",
                                height=320, margin=dict(l=10, r=10, t=10, b=10))
         st.plotly_chart(fig_wind, use_container_width=True)
 
@@ -202,7 +202,7 @@ if raw_data and anomaly_data:
                 mode='markers', name='IQR Anomaly',
                 marker=dict(color='crimson', size=10, symbol='x')
             ))
-        fig_rad.update_layout(xaxis_title="Timestamp", yaxis_title="W/m²",
+        fig_rad.update_layout(xaxis_title="Timestamp (UTC)", yaxis_title="W/m²",
                               height=320, margin=dict(l=10, r=10, t=10, b=10))
         st.plotly_chart(fig_rad, use_container_width=True)
 

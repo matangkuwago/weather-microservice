@@ -146,5 +146,5 @@ def handle_agent_chat(payload: ChatRequest):
     except Exception as e:
         logger.error(f"Chat execution routine blocked: {e}", exc_info=True)
         return ChatResponse(
-            reply="The AI assistant is online but encountered an extraction parsing fault."
+            reply="The AI agent has encountered a system issue. Please report this issue to the system administrator."
         )

@@ -113,16 +113,27 @@ async def get_anomalies(
 
 
 @app.post("/v1/chat", response_model=ChatResponse)
-async def handle_agent_chat(payload: ChatRequest):
+def handle_agent_chat(payload: ChatRequest):
     try:
         executor = get_weather_agent_executor()
-
-        # Invoke the LangChain computational chain
-        # The agent resolves time queries, hooks the tool, extracts database rows,
-        # and calculates other relevant data
         result = executor.invoke(
             {"input": payload.message, "chat_history": []})
 
-        return ChatResponse(reply=result["output"])
+        raw_output = result.get("output", "")
+
+        # Handle newer Anthropic nested response formats natively
+        if isinstance(raw_output, list) and len(raw_output) > 0:
+            # Extract text key content from the first content block dictionary
+            clean_reply = raw_output[0].get("text", str(raw_output))
+        elif isinstance(raw_output, dict):
+            clean_reply = raw_output.get("text", str(raw_output))
+        else:
+            clean_reply = str(raw_output)
+
+        return ChatResponse(reply=clean_reply)
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Agent Error: {str(e)}")
+        logger.error(f"Chat execution routine blocked: {e}", exc_info=True)
+        return ChatResponse(
+            reply="The AI assistant is online but encountered an extraction parsing fault."
+        )

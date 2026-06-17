@@ -73,7 +73,7 @@ OPENAI_API_KEY=sk-proj-xxxx...
 OPENAI_MODEL=gpt-4o
 
 ANTHROPIC_API_KEY=sk-ant-xxxx...
-ANTHROPIC_MODEL=claude-3-5-sonnet-20241022
+ANTHROPIC_MODEL=claude-sonnet-4-6
 ```
 
 ### 2. Launch the Entire System Stack

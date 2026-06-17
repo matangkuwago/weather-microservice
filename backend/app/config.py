@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     AI_PROVIDER: Literal["ollama", "openai", "anthropic"] = "ollama"
     OLLAMA_MODEL: str = "qwen2.5:7b"
     OPENAI_MODEL: str = "gpt-4o"
-    ANTHROPIC_MODEL: str = "claude-3-5-sonnet-20241022"
+    ANTHROPIC_MODEL: str = "claude-sonnet-4-6"
     OLLAMA_BASE_URL: str = "http://ollama:11434"
     OPENAI_API_KEY: str = ""
     ANTHROPIC_API_KEY: str = ""

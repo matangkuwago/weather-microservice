@@ -215,7 +215,8 @@ def get_weather_agent_executor() -> AgentExecutor:
 
     # return cached instance if provider hasn't changed
     if _cached_executor is not None and _cached_provider_string == current_provider:
-        logger.info("Reusing cached AgentExecutor instance.")
+        logger.info(
+            f"Reusing cached {_cached_provider_string} AgentExecutor instance.")
         return _cached_executor
 
     # re-initialize only on config change or first run

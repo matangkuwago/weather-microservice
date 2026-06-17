@@ -202,10 +202,26 @@ def get_llm_provider():
             f"Unsupported AI Provider configured: {settings.AI_PROVIDER}")
 
 
-def get_weather_agent_executor():
-    tools = [get_weather_data, get_weather_anomalies]
+# for caching agent instances at runtime
+_cached_executor: AgentExecutor | None = None
+_cached_provider_string: str | None = None
 
-    # Resolve the client dynamically based on environment configuration
+
+def get_weather_agent_executor() -> AgentExecutor:
+    """Returns a cached AgentExecutor; reconstructs if config changes."""
+    global _cached_executor, _cached_provider_string
+
+    current_provider = str(settings.AI_PROVIDER).strip().lower()
+
+    # return cached instance if provider hasn't changed
+    if _cached_executor is not None and _cached_provider_string == current_provider:
+        logger.info("Reusing cached AgentExecutor instance.")
+        return _cached_executor
+
+    # re-initialize only on config change or first run
+    logger.info(f"Compiling new agent for provider: {current_provider}")
+
+    tools = [get_weather_data, get_weather_anomalies]
     llm = get_llm_provider()
 
     locations = [k["name"] for k in PREDEFINED_LOCATIONS.values()]
@@ -221,12 +237,19 @@ def get_weather_agent_executor():
             "Always convert these timestamps into the user's local timezone when formulating your final response. "
             "The default multiplier threshold is 1.5, but users can scale it up to 4.0 to isolate extreme outliers. "
             "Always invoke the get_weather_data and get_weather_anomalies tools to look up information before formulating your final answer. "
+            "CRITICAL RULE: You must always think and respond exclusively in English. "
+            "Do not use Chinese characters, phrases, or grammar under any circumstances. Every word you output must be English."
         )),
         MessagesPlaceholder(variable_name="chat_history"),
         ("human", "{input}"),
         MessagesPlaceholder(variable_name="agent_scratchpad"),
     ])
 
-    # LangChain binds tools cleanly across Ollama, OpenAI, and Anthropic
+    # build the agent
     agent = create_tool_calling_agent(llm, tools, prompt)
-    return AgentExecutor(agent=agent, tools=tools, verbose=True)
+
+    # update the cache
+    _cached_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+    _cached_provider_string = current_provider
+
+    return _cached_executor

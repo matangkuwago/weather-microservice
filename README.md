@@ -66,9 +66,13 @@ Create a file named `.env` in the root directory:
 ```bash
 # Choose between: ollama, openai, or anthropic
 AI_PROVIDER=ollama
-OLLAMA_MODEL=qwen2.5:7b
 
-# Cloud API Tokens and models (Only required if AI_PROVIDER is set to cloud profiles)
+# Fill out these variables if using a local Ollama service
+OLLAMA_BASE_URL=http://host.docker.internal:11434
+OLLAMA_MODEL=qwen3.5:9b
+
+
+# Cloud API Tokens and models (Only required if AI_PROVIDER is set to openai or anthropic)
 OPENAI_API_KEY=sk-proj-xxxx...
 OPENAI_MODEL=gpt-4o
 
@@ -82,8 +86,6 @@ Compile and trigger all three containers simultaneously from your main project f
 ```bash
 docker compose up --build -d
 ```
-
-If `AI_PROVIDER` is set to `ollama`, the system will automatically pull and initialize the 4.7 GB Qwen model inside the docker build phase.
 
 ### 3. Verify System Infrastructure
 Open your browser to start exploring:

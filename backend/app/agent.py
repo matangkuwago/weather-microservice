@@ -243,8 +243,6 @@ def get_weather_agent_executor() -> AgentExecutor:
             "Always convert these timestamps into the user's local timezone when formulating your final response. "
             "The default multiplier threshold is 1.5, but users can scale it up to 4.0 to isolate extreme outliers. "
             "Always invoke the get_weather_data and get_weather_anomalies tools to look up information before formulating your final answer. "
-            "CRITICAL RULE: You must always think and respond exclusively in English. "
-            "Do not use Chinese characters, phrases, or grammar under any circumstances. Every word you output must be English."
         )),
         MessagesPlaceholder(variable_name="chat_history"),
         ("human", "{input}"),

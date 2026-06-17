@@ -96,7 +96,7 @@ OLLAMA_MODEL=qwen3.5:9b
 
 **For OpenAI**
 ```bash
-AI_PROVIDER=openai # or anthropic
+AI_PROVIDER=openai
 OPENAI_API_KEY=sk-proj-xxxx...
 OPENAI_MODEL=gpt-4o
 ```
@@ -114,7 +114,7 @@ ANTHROPIC_MODEL=claude-sonnet-4-6
 mkdir -p data
 
 # launch the containers
-docker-compose up --build
+docker compose up --build
 ```
 
 #### 4. Access the Applications

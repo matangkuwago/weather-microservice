@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     # historical data gets updated every 24 hours.
     SYNC_INTERVAL_SECONDS: int = 86400
 
+    # Open-Meteo API endpoint
+    OPEN_METEO_URL: str = "https://archive-api.open-meteo.com/v1/archive"
+
     # AI chat agent settings
     AI_PROVIDER: Literal["ollama", "openai", "anthropic"] = "ollama"
     OLLAMA_MODEL: str = "qwen3.5:9b"

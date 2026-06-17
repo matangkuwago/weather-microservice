@@ -4,6 +4,7 @@ import httpx
 from fastapi import HTTPException
 from typing import List, Tuple
 
+from app.config import settings
 from app.schemas import WeatherDataPoint
 
 
@@ -81,7 +82,7 @@ async def fetch_multi_location_weather(
     start_dates_array = ",".join([start] * num_locations)
     end_dates_array = ",".join([end] * num_locations)
 
-    url = "https://archive-api.open-meteo.com/v1/archive"
+    url = settings.OPEN_METEO_URL
     params = {
         "latitude": latitudes,
         "longitude": longitudes,

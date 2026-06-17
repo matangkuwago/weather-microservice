@@ -15,7 +15,6 @@ weather-service/
 ├── docker-compose.yml       # Multi-container service orchestrator
 ├── backend/
 │   ├── Dockerfile           # Backend container build instructions
-│   ├── Dockerfile.Ollama    # Ollama container build instructions
 │   ├── requirements.txt     # Package requirements for the backend
 │   └── app/
 │       ├── main.py          # FastAPI application server & routes

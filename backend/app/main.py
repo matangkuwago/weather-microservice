@@ -19,7 +19,7 @@ from app.schemas import (
     ChatResponse
 )
 from app.services import get_cached_weather, detect_iqr_anomalies
-from app.agent import get_weather_agent_executor
+from app.agent import get_weather_agent_executor, get_session_history
 
 
 # Logging configuration
@@ -116,19 +116,30 @@ async def get_anomalies(
 def handle_agent_chat(payload: ChatRequest):
     try:
         executor = get_weather_agent_executor()
-        result = executor.invoke(
-            {"input": payload.message, "chat_history": []})
+
+        # Fetch this specific user's conversational thread
+        history_backend = get_session_history(payload.session_id)
+
+        # Invoke the agent, passing the historical messages array
+        result = executor.invoke({
+            "input": payload.message,
+            "chat_history": history_backend.messages
+        })
 
         raw_output = result.get("output", "")
 
         # Handle newer Anthropic nested response formats natively
         if isinstance(raw_output, list) and len(raw_output) > 0:
-            # Extract text key content from the first content block dictionary
-            clean_reply = raw_output[0].get("text", str(raw_output))
+            clean_reply = raw_output[0].get("text", str(raw_output)) if isinstance(
+                raw_output[0], dict) else str(raw_output)
         elif isinstance(raw_output, dict):
             clean_reply = raw_output.get("text", str(raw_output))
         else:
             clean_reply = str(raw_output)
+
+        # Commit the current turn to memory so the AI remembers it on the next request
+        history_backend.add_user_message(payload.message)
+        history_backend.add_ai_message(clean_reply)
 
         return ChatResponse(reply=clean_reply)
 

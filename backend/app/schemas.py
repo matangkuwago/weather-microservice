@@ -78,6 +78,7 @@ class AnomalyResponse(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str
+    session_id: str = "default-session"
 
 
 class ChatResponse(BaseModel):

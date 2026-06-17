@@ -3,6 +3,7 @@ from datetime import datetime
 
 from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.chat_history import InMemoryChatMessageHistory
 from langchain_core.tools import tool
 from langchain_anthropic import ChatAnthropic
 from langchain_openai import ChatOpenAI
@@ -206,6 +207,10 @@ def get_llm_provider():
 _cached_executor: AgentExecutor | None = None
 _cached_provider_string: str | None = None
 
+# A simple dictionary mapping unique session IDs to their chat logs
+# E.g., {"session_abc123": InMemoryChatMessageHistory(...)}
+_chat_history_store: dict[str, InMemoryChatMessageHistory] = {}
+
 
 def get_weather_agent_executor() -> AgentExecutor:
     """Returns a cached AgentExecutor; reconstructs if config changes."""
@@ -254,3 +259,13 @@ def get_weather_agent_executor() -> AgentExecutor:
     _cached_provider_string = current_provider
 
     return _cached_executor
+
+
+def get_session_history(session_id: str) -> InMemoryChatMessageHistory:
+    """Retrieves or creates a standalone conversation history for a unique browser session."""
+
+    global _chat_history_store
+
+    if session_id not in _chat_history_store:
+        _chat_history_store[session_id] = InMemoryChatMessageHistory()
+    return _chat_history_store[session_id]

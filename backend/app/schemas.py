@@ -1,13 +1,7 @@
 from datetime import date, datetime
 from typing import List, Optional
 from pydantic import BaseModel, Field, field_validator
-
-
-PREDEFINED_LOCATIONS = {
-    "mnl": {"name": "Manila", "lat": 14.5995, "lon": 120.9842},
-    "tk": {"name": "Tokyo", "lat": 35.6762, "lon": 139.6503},
-    "ny": {"name": "New York", "lat": 40.7128, "lon": -74.0060},
-}
+from app.config import settings
 
 
 class WeatherDataPoint(BaseModel):
@@ -28,9 +22,9 @@ class WeatherQueryParams(BaseModel):
         """Runtime validator to ensure the location exists in our master dictionary."""
         normalized_value = value.strip().lower()
 
-        if normalized_value not in PREDEFINED_LOCATIONS:
+        if normalized_value not in settings.PREDEFINED_LOCATIONS:
             allowed_keys = ", ".join(
-                f"'{k}'" for k in PREDEFINED_LOCATIONS.keys())
+                f"'{k}'" for k in settings.PREDEFINED_LOCATIONS.keys())
             raise ValueError(
                 f"Invalid location_id '{value}'. Must be one of: {allowed_keys}"
             )

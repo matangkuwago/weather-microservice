@@ -5,10 +5,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.database import engine, Base, get_db
 from app.tasks import sync_weather_data
 from app.schemas import (
-    PREDEFINED_LOCATIONS,
     LocationMeta,
     LocationListResponse,
     WeatherQueryParams,
@@ -65,7 +65,7 @@ async def get_supported_locations():
     # Passes directly into the unified LocationMeta class without coordinate padding
     meta_list = [
         LocationMeta(id=loc_id, name=details["name"])
-        for loc_id, details in PREDEFINED_LOCATIONS.items()
+        for loc_id, details in settings.PREDEFINED_LOCATIONS.items()
     ]
     return LocationListResponse(locations=meta_list)
 

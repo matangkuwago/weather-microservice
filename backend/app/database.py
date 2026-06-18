@@ -28,7 +28,7 @@ class WeatherData(Base):
     __tablename__ = "weather_data"
 
     id = Column(Integer, primary_key=True, index=True)
-    # location_id should store keys in PREDEFINED_LOCATIONS
+    # location_id should store keys in settings.PREDEFINED_LOCATIONS
     location_id = Column(String, index=True, nullable=False)
     timestamp = Column(DateTime, index=True, nullable=False)
     wind_speed = Column(Float, nullable=False)

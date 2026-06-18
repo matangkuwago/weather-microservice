@@ -13,7 +13,6 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import SessionLocal
 from app.schemas import (
-    PREDEFINED_LOCATIONS,
     WeatherDataPoint,
     WeatherQueryParams,
     WeatherSummary,
@@ -28,7 +27,7 @@ logger = logging.getLogger("weather-agent")
 
 def get_location_id(location_name: str) -> str:
     location_id = next(
-        (k for k, v in PREDEFINED_LOCATIONS.items()
+        (k for k, v in settings.PREDEFINED_LOCATIONS.items()
          if v["name"].lower() == location_name.lower()),
         None
     )
@@ -41,7 +40,7 @@ def get_location_id(location_name: str) -> str:
 def get_weather_data(location_name: str, start_date: str, end_date: str) -> WeatherSummary | ToolError:
     """
     Fetches raw wind speed and solar radiation metrics for a given location and date range.
-    - location: Must be one of the names in PREDEFINED_LOCATIONS
+    - location: Must be one of the names in settings.PREDEFINED_LOCATIONS
     - start_date: Format 'YYYY-MM-DD'
     - end_date: Format 'YYYY-MM-DD'
     """
@@ -50,7 +49,7 @@ def get_weather_data(location_name: str, start_date: str, end_date: str) -> Weat
 
         if not location_id:
             allowed_names = ", ".join([v["name"]
-                                      for v in PREDEFINED_LOCATIONS.values()])
+                                      for v in settings.PREDEFINED_LOCATIONS.values()])
             return {"error": f"Location '{location_name}' is not supported. Choose from: {allowed_names}"}
 
         params = WeatherQueryParams(
@@ -109,7 +108,7 @@ def get_weather_data(location_name: str, start_date: str, end_date: str) -> Weat
 def get_weather_anomalies(location_name: str, start_date: str, end_date: str, threshold: float = 1.5) -> AnomalyReport | ToolError:
     """
     Finds IQR anomalies for wind or solar radiation for a specific date range and location.
-    - location: Must be one of the names in PREDEFINED_LOCATIONS
+    - location: Must be one of the names in settings.PREDEFINED_LOCATIONS
     - start_date: Format 'YYYY-MM-DD'
     - end_date: Format 'YYYY-MM-DD'
     """
@@ -119,7 +118,7 @@ def get_weather_anomalies(location_name: str, start_date: str, end_date: str, th
 
         if not location_id:
             allowed_names = ", ".join([v["name"]
-                                      for v in PREDEFINED_LOCATIONS.values()])
+                                      for v in settings.PREDEFINED_LOCATIONS.values()])
             return ToolError(error=f"Location '{location_name}' is not supported. "
                              f"Choose from: {allowed_names}"
                              )
@@ -230,7 +229,7 @@ def get_weather_agent_executor() -> AgentExecutor:
     tools = [get_weather_data, get_weather_anomalies]
     llm = get_llm_provider()
 
-    locations = [k["name"] for k in PREDEFINED_LOCATIONS.values()]
+    locations = [k["name"] for k in settings.PREDEFINED_LOCATIONS.values()]
 
     prompt = ChatPromptTemplate.from_messages([
         ("system", (

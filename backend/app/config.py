@@ -1,8 +1,19 @@
-from typing import Literal
+from typing import Literal, Any
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+
+    # Location settings
+    PREDEFINED_LOCATIONS: dict[str, dict[str, Any]] = Field(
+        default={
+            "mnl": {"name": "Manila", "lat": 14.5995, "lon": 120.9842},
+            "tk": {"name": "Tokyo", "lat": 35.6762, "lon": 139.6503},
+            "ny": {"name": "New York", "lat": 40.7128, "lon": -74.0060},
+        }
+    )
+
     # Number of days of historical data to keep tracked in local SQLite
     SYNC_HISTORY_DAYS: int = 30
 

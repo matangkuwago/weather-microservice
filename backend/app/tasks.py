@@ -10,7 +10,7 @@ from sqlalchemy.dialects.sqlite import insert
 from app.database import get_db, WeatherData
 from app.config import settings
 from app.open_meteo import fetch_multi_location_weather
-from app.schemas import PREDEFINED_LOCATIONS, WeatherDataPoint
+from app.schemas import WeatherDataPoint
 
 
 logger = logging.getLogger("weather-tasks")
@@ -103,7 +103,7 @@ async def sync_weather_data():
             total_inserted = 0
 
             for chunk_start, chunk_end in _chunk_date_range(start_fetch_date, end_fetch_date, settings.DAYS_CHUNK_SIZE):
-                for locations in _chunk_locations(PREDEFINED_LOCATIONS, settings.LOCATION_CHUNK_SIZE):
+                for locations in _chunk_locations(settings.PREDEFINED_LOCATIONS, settings.LOCATION_CHUNK_SIZE):
 
                     if chunk_start <= chunk_end:
                         location_names = ", ".join(

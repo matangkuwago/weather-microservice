@@ -5,9 +5,9 @@ from datetime import datetime, time
 from typing import List, Tuple, Dict
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.database import WeatherData
 from app.schemas import (
-    PREDEFINED_LOCATIONS,
     WeatherQueryParams,
     WeatherDataPoint,
     AnomalyPoint
@@ -30,15 +30,15 @@ def get_cached_weather(
         A tuple containing location metadata and a list of weather records.
 
     Raises:
-        KeyError: If the location_id is not found in PREDEFINED_LOCATIONS.
+        KeyError: If the location_id is not found in settings.PREDEFINED_LOCATIONS.
     """
 
     loc_id = params.location_id
-    if loc_id not in PREDEFINED_LOCATIONS:
+    if loc_id not in settings.PREDEFINED_LOCATIONS:
         raise KeyError(
             f"Location ID {loc_id} not found in predefined locations.")
 
-    coords = PREDEFINED_LOCATIONS[loc_id]
+    coords = settings.PREDEFINED_LOCATIONS[loc_id]
 
     start_dt = datetime.combine(params.start_date, time.min)
     end_dt = datetime.combine(params.end_date, time.max)

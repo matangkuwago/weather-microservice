@@ -1,10 +1,11 @@
 import asyncio
 import logging
 
+from typing import List
 from datetime import datetime, date, timedelta
 from sqlalchemy import func
 from sqlalchemy.orm import Session
-from typing import List
+from sqlalchemy.dialects.sqlite import insert
 
 from app.database import get_db, WeatherData
 from app.config import settings
@@ -35,36 +36,32 @@ def _chunk_date_range(start_date: datetime, end_date: datetime, max_days: int):
 def _save_batch_data(location_ids: List[str], batch_api_data: List[List[WeatherDataPoint]], db: Session):
     """Bulk-inserts historical weather metrics for multiple locations."""
 
-    inserted_count = 0
-
-    # Collect all new records in memory first, then add them in bulk
-    new_records = []
-
+    # Prepare raw dictionaries (much faster than instantiating ORM objects)
+    mappings = []
     for loc_id, location_points in zip(location_ids, batch_api_data):
         for item in location_points:
+            mappings.append({
+                "location_id": loc_id,
+                "timestamp": item.timestamp,
+                "wind_speed": item.wind_speed,
+                "radiation": item.radiation
+            })
 
-            exists = db.query(WeatherData).filter(
-                WeatherData.location_id == loc_id,
-                WeatherData.timestamp == item.timestamp
-            ).first()
+    if not mappings:
+        logger.info("No data received in batch.")
+        return 0
 
-            if not exists:
-                new_record = WeatherData(
-                    location_id=loc_id,
-                    timestamp=item.timestamp,
-                    wind_speed=item.wind_speed,
-                    radiation=item.radiation
-                )
-                new_records.append(new_record)
-                inserted_count += 1
+    # Build the SQLite-specific INSERT OR IGNORE statement
+    stmt = insert(WeatherData).values(mappings)
+    stmt = stmt.on_conflict_do_nothing(
+        index_elements=['location_id', 'timestamp'])
 
-    if new_records:
-        db.add_all(new_records)
-        db.commit()
-    else:
-        logger.info("No new data to insert.")
+    # Execute and commit
+    result = db.execute(stmt)
+    db.commit()
 
-    return inserted_count
+    # Note: rowcount will return the number of successfully inserted rows
+    return result.rowcount
 
 
 async def sync_weather_data():

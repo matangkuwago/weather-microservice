@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import httpx
 
@@ -93,68 +94,91 @@ async def fetch_multi_location_weather(
         "timezone": "UTC"
     }
 
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        response = await client.get(url, params=params)
+    max_retries = settings.OPEN_METEO_MAX_RETRIES
+    retry_delay = settings.OPEN_METEO_RETRY_DELAY
+    timeout = settings.OPEN_METEO_TIMEOUT
 
-        # Defensive check: Log the raw payload if the server fails so we can catch it before crashing
-        if response.status_code != 200:
-            logger.error(
-                f"Open-Meteo API returned error status: {response.status_code}. Server dump: {response.text}")
-            raise HTTPException(
-                status_code=502, detail="Error batch fetching data from Open-Meteo")
+    for attempt in range(max_retries):
 
-        try:
-            raw_data = response.json()
-        except Exception:
-            logger.critical(
-                f"JSON Parsing failed! Raw content was: {response.text}")
-            raise HTTPException(
-                status_code=502, detail="Open-Meteo response could not be parsed as JSON.")
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            try:
+                response = await client.get(url, params=params)
+            except Exception as e:
+                # Handle connection errors (e.g., timeout, connection reset)
+                logger.warning(
+                    f"Attempt {attempt + 1}/{max_retries} failed with exception: {e}")
+                if attempt < max_retries - 1:
+                    logger.debug(f"Retrying in {retry_delay} seconds...")
+                    await asyncio.sleep(retry_delay)
+                    continue
+                else:
+                    raise
 
-        # Open-Meteo returns a single dict if 1 location is queried,
-        # or an explicit LIST of dicts if multiple coordinates are passed.
-        results = raw_data if isinstance(raw_data, list) else [raw_data]
-
-        batch_output = []
-        for index, location_node in enumerate(results):
-            hourly = location_node.get("hourly", {})
-            times = hourly.get("time", [])
-            winds = hourly.get("wind_speed_10m", [])
-            rads = hourly.get("shortwave_radiation", [])
-
-            if not (len(times) == len(winds) == len(rads)):
+            # Defensive check: Log the raw payload if the server fails so we can catch it before crashing
+            if response.status_code != 200:
                 logger.error(
-                    f"Mismatched array lengths received for coordinate index {index}")
-                continue
+                    f"Open-Meteo API returned error status: {response.status_code}. Server dump: {response.text}")
+                raise HTTPException(
+                    status_code=502, detail="Error batch fetching data from Open-Meteo")
 
-            if None in winds:
-                logger.warning(
-                    f"Gaps identified in wind speeds for location index {index}. Interpolating...")
-                winds = interpolate_series(winds)
-            if None in rads:
-                logger.warning(
-                    f"Gaps identified in solar radiation for location index {index}. Interpolating...")
-                rads = interpolate_series(rads)
+            try:
+                raw_data = response.json()
+            except Exception:
+                logger.critical(
+                    f"JSON Parsing failed! Raw content was: {response.text}")
+                raise HTTPException(
+                    status_code=502, detail="Open-Meteo response could not be parsed as JSON.")
 
-            normalized_location_points = []
+            # Open-Meteo returns a single dict if 1 location is queried,
+            # or an explicit LIST of dicts if multiple coordinates are passed.
+            results = raw_data if isinstance(raw_data, list) else [raw_data]
 
-            for t, w, r in zip(times, winds, rads):
-                w = max(0.0, float(w))
-                r = max(0.0, float(r))
+            weather_series = []
+            for index, location_node in enumerate(results):
+                hourly = location_node.get("hourly", {})
+                times = hourly.get("time", [])
+                winds = hourly.get("wind_speed_10m", [])
+                rads = hourly.get("shortwave_radiation", [])
 
-                if w > 450.0:
+                if not times:
+                    logger.warning(
+                        f"No time series data received for coordinate index {index}. Skipping.")
+                    continue
+
+                if not (len(times) == len(winds) == len(rads)):
                     logger.error(
-                        f"Unrealistic wind speed peak intercepted ({w} km/h) at {t}. Clipping.")
-                    w = 450.0
-                if r > 1400.0:
-                    logger.error(
-                        f"Unrealistic solar radiation spike intercepted ({r} W/m²) at {t}. Clipping.")
-                    r = 1400.0
+                        f"Mismatched array lengths received for coordinate index {index}")
+                    continue
 
-                normalized_location_points.append(
-                    WeatherDataPoint(timestamp=t, wind_speed=w, radiation=r)
-                )
+                if None in winds:
+                    logger.debug(
+                        f"Gaps identified in wind speeds for location index {index}. Interpolating...")
+                    winds = interpolate_series(winds)
+                if None in rads:
+                    logger.debug(
+                        f"Gaps identified in solar radiation for location index {index}. Interpolating...")
+                    rads = interpolate_series(rads)
 
-            batch_output.append(normalized_location_points)
+                normalized_location_points = []
 
-        return batch_output
+                for t, w, r in zip(times, winds, rads):
+                    w = max(0.0, float(w))
+                    r = max(0.0, float(r))
+
+                    if w > settings.MAX_WIND_VALUE:
+                        logger.error(
+                            f"Unrealistic wind speed peak intercepted ({w} km/h) at {t}. Clipping.")
+                        w = settings.MAX_WIND_VALUE
+                    if r > settings.MAX_SOLAR_RADIATION_VALUE:
+                        logger.error(
+                            f"Unrealistic solar radiation spike intercepted ({r} W/m²) at {t}. Clipping.")
+                        r = settings.MAX_SOLAR_RADIATION_VALUE
+
+                    normalized_location_points.append(
+                        WeatherDataPoint(
+                            timestamp=t, wind_speed=w, radiation=r)
+                    )
+
+                weather_series.append(normalized_location_points)
+
+            return weather_series

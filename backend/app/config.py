@@ -14,6 +14,19 @@ class Settings(BaseSettings):
     # Open-Meteo API endpoint
     OPEN_METEO_URL: str = "https://archive-api.open-meteo.com/v1/archive"
 
+    # Retry parameters in case Open-Meteo API calls fail
+    OPEN_METEO_MAX_RETRIES: int = 3
+    OPEN_METEO_RETRY_DELAY: float = 2.0
+    OPEN_METEO_TIMEOUT: float = 15.0
+
+    # Open-Meteo API downloads will be divided into these chunks
+    LOCATION_CHUNK_SIZE: int = 3
+    DAYS_CHUNK_SIZE: int = 30
+
+    # Data clipping parameters
+    MAX_WIND_VALUE: float = 450.0
+    MAX_SOLAR_RADIATION_VALUE: float = 1400.0
+
     # AI chat agent settings
     AI_PROVIDER: Literal["ollama", "openai", "anthropic"] = "ollama"
     OLLAMA_MODEL: str = "qwen3.5:9b"

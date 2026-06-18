@@ -1,17 +1,67 @@
 import asyncio
 import logging
 
+from typing import List
 from datetime import datetime, date, timedelta
 from sqlalchemy import func
 from sqlalchemy.orm import Session
+from sqlalchemy.dialects.sqlite import insert
 
 from app.database import get_db, WeatherData
 from app.config import settings
 from app.open_meteo import fetch_multi_location_weather
-from app.schemas import PREDEFINED_LOCATIONS
+from app.schemas import PREDEFINED_LOCATIONS, WeatherDataPoint
 
 
 logger = logging.getLogger("weather-tasks")
+
+
+def _chunk_locations(locations_dict: dict, max_locations: int):
+    """Yields locations not exceeding max_locations."""
+    items = list(locations_dict.items())
+    for i in range(0, len(items), max_locations):
+        yield dict(items[i:i + max_locations])
+
+
+def _chunk_date_range(start_date: datetime, end_date: datetime, max_days: int):
+    """Yields tuple intervals of (start_date, end_date) not exceeding max_days."""
+    current_start = start_date
+    while current_start <= end_date:
+        current_end = min(
+            current_start + timedelta(days=max_days - 1), end_date)
+        yield current_start, current_end
+        current_start = current_end + timedelta(days=1)
+
+
+def _save_batch_data(location_ids: List[str], batch_api_data: List[List[WeatherDataPoint]], db: Session):
+    """Bulk-inserts historical weather metrics for multiple locations."""
+
+    # Prepare raw dictionaries (much faster than instantiating ORM objects)
+    mappings = []
+    for loc_id, location_points in zip(location_ids, batch_api_data):
+        for item in location_points:
+            mappings.append({
+                "location_id": loc_id,
+                "timestamp": item.timestamp,
+                "wind_speed": item.wind_speed,
+                "radiation": item.radiation
+            })
+
+    if not mappings:
+        logger.info("No data received in batch.")
+        return 0
+
+    # Build the SQLite-specific INSERT OR IGNORE statement
+    stmt = insert(WeatherData).values(mappings)
+    stmt = stmt.on_conflict_do_nothing(
+        index_elements=['location_id', 'timestamp'])
+
+    # Execute and commit
+    result = db.execute(stmt)
+    db.commit()
+
+    # Note: rowcount will return the number of successfully inserted rows
+    return result.rowcount
 
 
 async def sync_weather_data():
@@ -19,13 +69,14 @@ async def sync_weather_data():
     Background worker that runs every hour. It is responsible for finding data gaps
     in SQLite and downloading incremental updates to keep the cache full.
     """
+
     while True:
         logger.info("Starting background weather data gap analysis...")
 
         db: Session = next(get_db())
         try:
             today = date.today()
-            history_delta = timedelta(days=settings.SYNC_HISTORY_DAYS)
+            history_delta = timedelta(days=settings.SYNC_HISTORY_DAYS - 1)
             cutoff_datetime = datetime.combine(
                 today - history_delta, datetime.min.time())
 
@@ -49,50 +100,30 @@ async def sync_weather_data():
 
             end_fetch_date = today
 
-            # Trigger a single batched network call if updates are required
-            if start_fetch_date <= end_fetch_date:
-                logger.info(
-                    f"Syncing gaps: Fetching data from {start_fetch_date} to {end_fetch_date} for all cities.")
+            total_inserted = 0
 
-                loc_ids = list(PREDEFINED_LOCATIONS.keys())
-                coord_list = [(PREDEFINED_LOCATIONS[lid]["lat"],
-                               PREDEFINED_LOCATIONS[lid]["lon"]) for lid in loc_ids]
+            for chunk_start, chunk_end in _chunk_date_range(start_fetch_date, end_fetch_date, settings.DAYS_CHUNK_SIZE):
+                for locations in _chunk_locations(PREDEFINED_LOCATIONS, settings.LOCATION_CHUNK_SIZE):
 
-                batch_api_data = await fetch_multi_location_weather(
-                    coord_list, str(start_fetch_date), str(end_fetch_date)
-                )
+                    if chunk_start <= chunk_end:
+                        location_names = ", ".join(
+                            [v["name"] for v in locations.values()])
+                        logger.info(
+                            f"Syncing gaps: Fetching data from {chunk_start} to {chunk_end} for locations {location_names}.")
 
-                inserted_count = 0
+                        location_ids = list(locations.keys())
+                        coord_list = [(locations[lid]["lat"],
+                                       locations[lid]["lon"]) for lid in location_ids]
 
-                # Collect all new records in memory first, then add them in bulk
-                new_records = []
+                        batch_api_data = await fetch_multi_location_weather(
+                            coord_list, str(chunk_start), str(chunk_end)
+                        )
 
-                for loc_id, location_points in zip(loc_ids, batch_api_data):
-                    for item in location_points:
-                        # Check existence efficiently
-                        exists = db.query(WeatherData).filter(
-                            WeatherData.location_id == loc_id,
-                            WeatherData.timestamp == item.timestamp
-                        ).first()
+                        total_inserted += _save_batch_data(
+                            location_ids, batch_api_data, db)
 
-                        if not exists:
-                            new_record = WeatherData(
-                                location_id=loc_id,
-                                timestamp=item.timestamp,
-                                wind_speed=item.wind_speed,
-                                radiation=item.radiation
-                            )
-                            new_records.append(new_record)
-                            inserted_count += 1
-
-                # Bulk add to database
-                if new_records:
-                    db.add_all(new_records)
-                    db.commit()
-                    logger.info(
-                        f"Sync task complete. Successfully filled {inserted_count} missing hours into SQLite.")
-                else:
-                    logger.info("No new data to insert.")
+            logger.info(
+                f"Sync complete. Total number of records inserted: {total_inserted}.")
 
         except asyncio.CancelledError:
             logger.info("Sync worker received a shutdown cancellation signal.")

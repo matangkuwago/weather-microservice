@@ -1,13 +1,9 @@
-import os
 import json
-import streamlit as st
 import requests
+import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-from datetime import date, timedelta
-
-
-BACKEND_URL = os.getenv("BACKEND_URL", "http://backend:8000/v1")
+from config import settings
 
 
 # ==========================================
@@ -55,11 +51,12 @@ apply_production_styles()
 st.title("🌦️ Weather Analytics & Anomaly Dashboard")
 
 
-@st.cache_data(ttl=600)  # Cache the city list for 10 minutes
+# Cache the city list for 10 minutes
+@st.cache_data(ttl=settings.TTL_LOCATIONS)
 def fetch_supported_locations():
     """Queries the FastAPI endpoint to pull current valid metadata locations."""
     try:
-        response = requests.get(f"{BACKEND_URL}/locations")
+        response = requests.get(f"{settings.BACKEND_URL}/locations")
         if response.status_code == 200:
             return response.json().get("locations", [])
         else:
@@ -90,29 +87,21 @@ else:
     selected_location = st.sidebar.selectbox("Select Location", ["Manila"])
     location_id = "mnl"
 
-# Default to the last 30 days
-today = date.today()
-thirty_days_ago = today - timedelta(days=30)
-
 start_date = st.sidebar.date_input(
     "Start Date",
-    value=thirty_days_ago,
-    min_value=thirty_days_ago,  # Restricts user from clicking dates older than 30 days
-    max_value=today             # Restricts user from clicking future dates
+    value=settings.DEFAULT_START_DATE
 )
 end_date = st.sidebar.date_input(
     "End Date",
-    value=today,
-    min_value=thirty_days_ago,  # Restricts user from clicking dates older than 30 days
-    max_value=today             # Restricts user from clicking future dates
+    value=settings.DEFAULT_END_DATE,
 )
 
 threshold = st.sidebar.slider(
     label="IQR Anomaly Threshold (Factor)",
-    min_value=1.0,
-    max_value=4.0,     # Extended upper limit for extreme outlier filtering
-    value=1.5,         # Standard default Tukey outlier baseline
-    step=0.1
+    min_value=settings.IQR_MIN,
+    max_value=settings.IQR_MAX,
+    value=settings.IQR_DEFAULT_VALUE,
+    step=settings.IQR_STEP
 )
 
 if start_date > end_date:
@@ -123,17 +112,19 @@ if start_date > end_date:
 # ==========================================
 
 
-@st.cache_data(ttl=60)  # Cache for 1 minute to prevent aggressive refetches
+# Set cache to prevent aggressive refetches
+@st.cache_data(ttl=settings.TTL_WEATHER_DATA)
 def fetch_weather_and_anomalies(loc, start, end, iqr_factor):
     params = {
         "location_id": loc,
         "start_date": str(start),
         "end_date": str(end)
     }
-    raw_res = requests.get(f"{BACKEND_URL}/weather-data", params=params)
+    raw_res = requests.get(
+        f"{settings.BACKEND_URL}/weather-data", params=params)
     anom_params = {**params, "threshold": iqr_factor}
     anom_res = requests.get(
-        f"{BACKEND_URL}/weather-data/anomalies", params=anom_params)
+        f"{settings.BACKEND_URL}/weather-data/anomalies", params=anom_params)
 
     if raw_res.status_code == 200 and anom_res.status_code == 200:
         return raw_res.json(), anom_res.json()
@@ -240,7 +231,7 @@ if raw_data and anomaly_data:
 
                 try:
                     res = requests.post(
-                        f"{BACKEND_URL}/chat", json={"message": user_query}, stream=True)
+                        f"{settings.BACKEND_URL}/chat", json={"message": user_query}, stream=True)
 
                     for chunk in res.iter_content(chunk_size=None, decode_unicode=True):
                         if chunk:

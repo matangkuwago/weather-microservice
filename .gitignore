@@ -223,3 +223,6 @@ data
 # --- OS Files ---
 .DS_Store
 Thumbs.db
+
+# Used for local testing only
+.python-version

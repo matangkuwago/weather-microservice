@@ -1,17 +1,16 @@
+# Standard library imports
 import json
-import requests
-import streamlit as st
+import uuid
 import pandas as pd
 import plotly.graph_objects as go
+import requests
+import streamlit as st
 from config import settings
 
 
-# ==========================================
-# PAGE CONFIG & CSS INJECTION
-# ==========================================
-st.set_page_config(page_title="Weather Analytics Dashboard", layout="wide")
-
-
+# ==========================
+# STYLING
+# ==========================
 def apply_production_styles():
     """Removes top whitespace while keeping the sidebar toggle icon functional."""
     st.markdown(
@@ -47,11 +46,9 @@ def apply_production_styles():
     )
 
 
-apply_production_styles()
-st.title("🌦️ Weather Analytics & Anomaly Dashboard")
-
-
-# Cache the city list for 10 minutes
+# ==========================
+# DATA FETCHING
+# ==========================
 @st.cache_data(ttl=settings.TTL_LOCATIONS)
 def fetch_supported_locations():
     """Queries the FastAPI endpoint to pull current valid metadata locations."""
@@ -68,51 +65,6 @@ def fetch_supported_locations():
         return []
 
 
-supported_locations = fetch_supported_locations()
-
-# ==========================================
-# SIDEBAR CONTROLS (Filters)
-# ==========================================
-st.sidebar.header("Data Controls")
-
-if supported_locations:
-    location_map = {loc["name"]: loc["id"] for loc in supported_locations}
-    selected_location = st.sidebar.selectbox(
-        "Select Location",
-        options=list(location_map.keys())
-    )
-    location_id = location_map[selected_location]
-else:
-    st.sidebar.warning("Using fallback static location mapping...")
-    selected_location = st.sidebar.selectbox("Select Location", ["Manila"])
-    location_id = "mnl"
-
-start_date = st.sidebar.date_input(
-    "Start Date",
-    value=settings.DEFAULT_START_DATE
-)
-end_date = st.sidebar.date_input(
-    "End Date",
-    value=settings.DEFAULT_END_DATE,
-)
-
-threshold = st.sidebar.slider(
-    label="IQR Anomaly Threshold (Factor)",
-    min_value=settings.IQR_MIN,
-    max_value=settings.IQR_MAX,
-    value=settings.IQR_DEFAULT_VALUE,
-    step=settings.IQR_STEP
-)
-
-if start_date > end_date:
-    st.sidebar.error("Error: Start date must be before end date.")
-
-# ==========================================
-# FETCH DATA FROM BACKEND
-# ==========================================
-
-
-# Set cache to prevent aggressive refetches
 @st.cache_data(ttl=settings.TTL_WEATHER_DATA)
 def fetch_weather_and_anomalies(loc, start, end, iqr_factor):
     params = {
@@ -131,77 +83,89 @@ def fetch_weather_and_anomalies(loc, start, end, iqr_factor):
     return None, None
 
 
-raw_data, anomaly_data = fetch_weather_and_anomalies(
-    location_id, start_date, end_date, threshold)
+# ==========================
+# UI RENDERING & HELPERS
+# ==========================
+def render_sidebar_controls():
+    """Renders the sidebar filters"""
+    st.sidebar.header("Data Controls")
 
-# ==========================================
-# VISUALIZATION & DATA RENDERING (Unified Single Column)
-# ==========================================
-if raw_data and anomaly_data:
-    # convert hourly data payload to pandas DataFrame
-    df = pd.DataFrame(raw_data["data"])
+    supported_locations = fetch_supported_locations()
 
-    if df.empty:
-        st.warning(
-            f"⚠️ No weather records found for {selected_location} "
-            f"between {start_date} and {end_date}. "
-            "Please select a different date range or wait for the background sync task to fetch it."
+    if supported_locations:
+        location_map = {loc["name"]: loc["id"] for loc in supported_locations}
+        selected_location = st.sidebar.selectbox(
+            "Select Location",
+            options=list(location_map.keys())
         )
+        location_id = location_map[selected_location]
     else:
-        df["timestamp"] = pd.to_datetime(df["timestamp"])
+        st.sidebar.warning("Using fallback static location mapping...")
+        selected_location = st.sidebar.selectbox("Select Location", ["Manila"])
+        location_id = "mnl"
 
-        wind_anoms = pd.DataFrame(anomaly_data["wind_speed_anomalies"])
-        rad_anoms = pd.DataFrame(anomaly_data["radiation_anomalies"])
+    start_date = st.sidebar.date_input(
+        "Start Date",
+        value=settings.DEFAULT_START_DATE
+    )
+    end_date = st.sidebar.date_input(
+        "End Date",
+        value=settings.DEFAULT_END_DATE,
+    )
 
-        if not wind_anoms.empty:
-            wind_anoms["timestamp"] = pd.to_datetime(wind_anoms["timestamp"])
-        if not rad_anoms.empty:
-            rad_anoms["timestamp"] = pd.to_datetime(rad_anoms["timestamp"])
+    threshold = st.sidebar.slider(
+        label="IQR Anomaly Threshold (Factor)",
+        min_value=settings.IQR_MIN,
+        max_value=settings.IQR_MAX,
+        value=settings.IQR_DEFAULT_VALUE,
+        step=settings.IQR_STEP
+    )
 
-        # ------------------------------------------
-        # SECTION 1: METRICS & TIME-SERIES CHARTS
-        # ------------------------------------------
-        st.subheader(f"📊 Analytics Summary for {selected_location}")
+    if start_date > end_date:
+        st.sidebar.error("Error: Start date must be before end date.")
 
-        col1, col2 = st.columns(2)
-        col1.metric("Max Wind Speed", f"{df['wind_speed'].max():.1f} km/h")
-        col2.metric("Max Solar Radiation", f"{df['radiation'].max():.1f} W/m²")
+    return selected_location, location_id, start_date, end_date, threshold
 
-        # Wind Speed Chart
-        st.write("#### Wind Speed Time-Series")
-        fig_wind = go.Figure()
+
+def render_metrics_and_charts(selected_location, df, wind_anoms, rad_anoms):
+    st.subheader(f"📊 Analytics Summary for {selected_location}")
+
+    col1, col2 = st.columns(2)
+    col1.metric("Max Wind Speed", f"{df['wind_speed'].max():.1f} km/h")
+    col2.metric("Max Solar Radiation", f"{df['radiation'].max():.1f} W/m²")
+
+    # Wind Speed Chart
+    st.write("#### Wind Speed Time-Series")
+    fig_wind = go.Figure()
+    fig_wind.add_trace(go.Scatter(
+        x=df["timestamp"], y=df["wind_speed"], name="Wind Speed (km/h)", line=dict(color='royalblue')))
+    if not wind_anoms.empty:
         fig_wind.add_trace(go.Scatter(
-            x=df["timestamp"], y=df["wind_speed"], name="Wind Speed (km/h)", line=dict(color='royalblue')))
-        if not wind_anoms.empty:
-            fig_wind.add_trace(go.Scatter(
-                x=wind_anoms["timestamp"], y=wind_anoms["value"],
-                mode='markers', name='IQR Anomaly',
-                marker=dict(color='crimson', size=10, symbol='x')
-            ))
-        fig_wind.update_layout(xaxis_title="Timestamp (UTC)", yaxis_title="km/h",
-                               height=320, margin=dict(l=10, r=10, t=10, b=10))
-        st.plotly_chart(fig_wind, use_container_width=True)
+            x=wind_anoms["timestamp"], y=wind_anoms["value"],
+            mode='markers', name='IQR Anomaly',
+            marker=dict(color='crimson', size=10, symbol='x')
+        ))
+    fig_wind.update_layout(xaxis_title="Timestamp (UTC)", yaxis_title="km/h",
+                           height=320, margin=dict(l=10, r=10, t=10, b=10))
+    st.plotly_chart(fig_wind, width='stretch')
 
-        # Solar Radiation Chart
-        st.write("#### Shortwave Solar Radiation Time-Series")
-        fig_rad = go.Figure()
+    # Solar Radiation Chart
+    st.write("#### Shortwave Solar Radiation Time-Series")
+    fig_rad = go.Figure()
+    fig_rad.add_trace(go.Scatter(
+        x=df["timestamp"], y=df["radiation"], name="Radiation (W/m²)", line=dict(color='orange')))
+    if not rad_anoms.empty:
         fig_rad.add_trace(go.Scatter(
-            x=df["timestamp"], y=df["radiation"], name="Radiation (W/m²)", line=dict(color='orange')))
-        if not rad_anoms.empty:
-            fig_rad.add_trace(go.Scatter(
-                x=rad_anoms["timestamp"], y=rad_anoms["value"],
-                mode='markers', name='IQR Anomaly',
-                marker=dict(color='crimson', size=10, symbol='x')
-            ))
-        fig_rad.update_layout(xaxis_title="Timestamp (UTC)", yaxis_title="W/m²",
-                              height=320, margin=dict(l=10, r=10, t=10, b=10))
-        st.plotly_chart(fig_rad, use_container_width=True)
+            x=rad_anoms["timestamp"], y=rad_anoms["value"],
+            mode='markers', name='IQR Anomaly',
+            marker=dict(color='crimson', size=10, symbol='x')
+        ))
+    fig_rad.update_layout(xaxis_title="Timestamp (UTC)", yaxis_title="W/m²",
+                          height=320, margin=dict(l=10, r=10, t=10, b=10))
+    st.plotly_chart(fig_rad, width='stretch')
 
-    # ------------------------------------------
-    # SECTION 2: LIVE AI CHAT ASSISTANT
-    # ------------------------------------------
-    # Keeping the chat assistant active below the graphs so users can still
-    # converse with the model even if the primary charts are empty.
+
+def render_chat_assistant():
     st.markdown("---")
     st.subheader("💬 AI Weather Assistant")
     st.write("Ask questions about anomalies, historical trends, or math summaries.")
@@ -210,6 +174,10 @@ if raw_data and anomaly_data:
 
     if "messages" not in st.session_state:
         st.session_state.messages = []
+
+    if "session_id" not in st.session_state:
+        # Using short UUID for simplicity
+        st.session_state.session_id = str(uuid.uuid4())[:8]
 
     with chat_container:
         for msg in st.session_state.messages:
@@ -230,8 +198,12 @@ if raw_data and anomaly_data:
                 clean_reply = ""
 
                 try:
+                    payload = {
+                        "message": user_query,
+                        "session_id": st.session_state.session_id
+                    }
                     res = requests.post(
-                        f"{settings.BACKEND_URL}/chat", json={"message": user_query}, stream=True)
+                        f"{settings.BACKEND_URL}/chat", json=payload, stream=True)
 
                     for chunk in res.iter_content(chunk_size=None, decode_unicode=True):
                         if chunk:
@@ -261,3 +233,50 @@ if raw_data and anomaly_data:
 
         st.session_state.messages.append(
             {"role": "assistant", "content": clean_reply})
+
+
+# ==========================
+# MAIN EXECUTION
+# ==========================
+def main():
+    st.set_page_config(page_title="Weather Analytics Dashboard", layout="wide")
+    apply_production_styles()
+    st.title("🌦️ Weather Analytics & Anomaly Dashboard")
+
+    selected_location, location_id, start_date, end_date, threshold = render_sidebar_controls()
+
+    raw_data, anomaly_data = fetch_weather_and_anomalies(
+        location_id, start_date, end_date, threshold)
+
+    if raw_data and anomaly_data:
+
+        df = pd.DataFrame(raw_data.get("data", []))
+
+        if df.empty:
+            st.warning(
+                f"⚠️ No weather records found for {selected_location} "
+                f"between {start_date} and {end_date}. "
+                "Please select a different date range or wait for the background sync task to fetch it."
+            )
+        else:
+            df["timestamp"] = pd.to_datetime(df["timestamp"])
+
+            wind_anoms = pd.DataFrame(
+                anomaly_data.get("wind_speed_anomalies", []))
+            rad_anoms = pd.DataFrame(
+                anomaly_data.get("radiation_anomalies", []))
+
+            if not wind_anoms.empty:
+                wind_anoms["timestamp"] = pd.to_datetime(
+                    wind_anoms["timestamp"])
+            if not rad_anoms.empty:
+                rad_anoms["timestamp"] = pd.to_datetime(rad_anoms["timestamp"])
+
+            render_metrics_and_charts(
+                selected_location, df, wind_anoms, rad_anoms)
+
+    render_chat_assistant()
+
+
+if __name__ == "__main__":
+    main()
